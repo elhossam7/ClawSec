@@ -1,5 +1,5 @@
 // Package agent implements the AI-powered SOC agent runtime.
-// It integrates with LLM APIs (Anthropic, OpenAI, Ollama) to provide
+// It integrates with LLM APIs (Anthropic, OpenAI, Ollama, Gemini) to provide
 // intelligent incident analysis, investigation, and response.
 package agent
 
@@ -23,14 +23,18 @@ import (
 type LLMClient interface {
 	Complete(ctx context.Context, messages []Message, tools []ToolDef) (*LLMResponse, error)
 	Provider() string
+	// SetModel swaps the active model name (used for fallback rotation).
+	SetModel(model string)
+	// GetModel returns the current model name.
+	GetModel() string
 }
 
 // Message represents a single chat-completion message.
 type Message struct {
-	Role       string     `json:"role"` // "system", "user", "assistant", "tool"
-	Content    string     `json:"content"`
-	ToolCallID string     `json:"tool_call_id,omitempty"`
-	ToolCalls  []LLMTool  `json:"tool_calls,omitempty"`
+	Role       string    `json:"role"` // "system", "user", "assistant", "tool"
+	Content    string    `json:"content"`
+	ToolCallID string    `json:"tool_call_id,omitempty"`
+	ToolCalls  []LLMTool `json:"tool_calls,omitempty"`
 }
 
 // LLMTool is a tool-use request returned by the LLM.
@@ -70,6 +74,8 @@ func NewLLMClient(cfg config.AIConfig) (LLMClient, error) {
 		return newOpenAIClient(cfg)
 	case "ollama":
 		return newOllamaClient(cfg)
+	case "gemini":
+		return newGeminiClient(cfg)
 	default:
 		return nil, fmt.Errorf("unsupported LLM provider: %q", cfg.Provider)
 	}
@@ -95,14 +101,16 @@ func newAnthropicClient(cfg config.AIConfig) (*anthropicClient, error) {
 		base = cfg.Endpoint
 	}
 	return &anthropicClient{
-		apiKey:  cfg.APIKey,
-		model:   cfg.Model,
-		baseURL: base,
+		apiKey:     cfg.APIKey,
+		model:      cfg.Model,
+		baseURL:    base,
 		httpClient: &http.Client{Timeout: 120 * time.Second},
 	}, nil
 }
 
-func (c *anthropicClient) Provider() string { return "anthropic" }
+func (c *anthropicClient) Provider() string  { return "anthropic" }
+func (c *anthropicClient) SetModel(m string) { c.model = m }
+func (c *anthropicClient) GetModel() string  { return c.model }
 
 func (c *anthropicClient) Complete(ctx context.Context, messages []Message, tools []ToolDef) (*LLMResponse, error) {
 	// Separate system message from conversation.
@@ -226,14 +234,16 @@ func newOpenAIClient(cfg config.AIConfig) (*openaiClient, error) {
 		base = cfg.Endpoint
 	}
 	return &openaiClient{
-		apiKey:  cfg.APIKey,
-		model:   cfg.Model,
-		baseURL: base,
+		apiKey:     cfg.APIKey,
+		model:      cfg.Model,
+		baseURL:    base,
 		httpClient: &http.Client{Timeout: 120 * time.Second},
 	}, nil
 }
 
-func (c *openaiClient) Provider() string { return "openai" }
+func (c *openaiClient) Provider() string  { return "openai" }
+func (c *openaiClient) SetModel(m string) { c.model = m }
+func (c *openaiClient) GetModel() string  { return c.model }
 
 func (c *openaiClient) Complete(ctx context.Context, messages []Message, tools []ToolDef) (*LLMResponse, error) {
 	var apiMsgs []map[string]interface{}
@@ -348,7 +358,9 @@ func newOllamaClient(cfg config.AIConfig) (*ollamaClient, error) {
 	}, nil
 }
 
-func (c *ollamaClient) Provider() string { return "ollama" }
+func (c *ollamaClient) Provider() string  { return "ollama" }
+func (c *ollamaClient) SetModel(m string) { c.model = m }
+func (c *ollamaClient) GetModel() string  { return c.model }
 
 func (c *ollamaClient) Complete(ctx context.Context, messages []Message, tools []ToolDef) (*LLMResponse, error) {
 	var apiMsgs []map[string]string
@@ -427,4 +439,190 @@ func (c *ollamaClient) Complete(ctx context.Context, messages []Message, tools [
 		result.StopReason = "tool_use"
 	}
 	return result, nil
+}
+
+// ---------------------------------------------------------------------------
+// Google Gemini client
+// ---------------------------------------------------------------------------
+
+type geminiClient struct {
+	apiKey     string
+	model      string
+	baseURL    string
+	httpClient *http.Client
+}
+
+func newGeminiClient(cfg config.AIConfig) (*geminiClient, error) {
+	if cfg.APIKey == "" {
+		return nil, fmt.Errorf("gemini api_key is required")
+	}
+	base := "https://generativelanguage.googleapis.com"
+	if cfg.Endpoint != "" {
+		base = cfg.Endpoint
+	}
+	return &geminiClient{
+		apiKey:     cfg.APIKey,
+		model:      cfg.Model,
+		baseURL:    base,
+		httpClient: &http.Client{Timeout: 120 * time.Second},
+	}, nil
+}
+
+func (c *geminiClient) Provider() string  { return "gemini" }
+func (c *geminiClient) SetModel(m string) { c.model = m }
+func (c *geminiClient) GetModel() string  { return c.model }
+
+func (c *geminiClient) Complete(ctx context.Context, messages []Message, tools []ToolDef) (*LLMResponse, error) {
+	// Build Gemini contents from messages.
+	var systemInstruction string
+	var contents []map[string]interface{}
+
+	for _, m := range messages {
+		if m.Role == "system" {
+			systemInstruction = m.Content
+			continue
+		}
+
+		role := m.Role
+		if role == "assistant" {
+			role = "model"
+		}
+		if role == "tool" {
+			// Gemini expects function responses as "function" role parts.
+			contents = append(contents, map[string]interface{}{
+				"role": "function",
+				"parts": []map[string]interface{}{
+					{
+						"functionResponse": map[string]interface{}{
+							"name":     m.ToolCallID,
+							"response": map[string]interface{}{"result": m.Content},
+						},
+					},
+				},
+			})
+			continue
+		}
+
+		contents = append(contents, map[string]interface{}{
+			"role":  role,
+			"parts": []map[string]interface{}{{"text": m.Content}},
+		})
+	}
+
+	body := map[string]interface{}{
+		"contents": contents,
+		"generationConfig": map[string]interface{}{
+			"maxOutputTokens": 4096,
+			"temperature":     0.3,
+		},
+	}
+
+	// System instruction.
+	if systemInstruction != "" {
+		body["systemInstruction"] = map[string]interface{}{
+			"parts": []map[string]interface{}{{"text": systemInstruction}},
+		}
+	}
+
+	// Tool declarations.
+	if len(tools) > 0 {
+		var funcDecls []map[string]interface{}
+		for _, t := range tools {
+			decl := map[string]interface{}{
+				"name":        t.Name,
+				"description": t.Description,
+			}
+			if len(t.InputSchema) > 0 {
+				// Convert JSON Schema to Gemini's parameter format.
+				decl["parameters"] = t.InputSchema
+			}
+			funcDecls = append(funcDecls, decl)
+		}
+		body["tools"] = []map[string]interface{}{
+			{"functionDeclarations": funcDecls},
+		}
+	}
+
+	// POST to Gemini API.
+	url := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", c.baseURL, c.model, c.apiKey)
+	payload, _ := json.Marshal(body)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(payload))
+	if err != nil {
+		return nil, fmt.Errorf("building request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("gemini API call: %w", err)
+	}
+	defer resp.Body.Close()
+
+	data, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("gemini API %d: %s", resp.StatusCode, string(data))
+	}
+
+	var raw struct {
+		Candidates []struct {
+			Content struct {
+				Parts []struct {
+					Text         string `json:"text,omitempty"`
+					FunctionCall *struct {
+						Name string          `json:"name"`
+						Args json.RawMessage `json:"args"`
+					} `json:"functionCall,omitempty"`
+				} `json:"parts"`
+			} `json:"content"`
+			FinishReason string `json:"finishReason"`
+		} `json:"candidates"`
+		UsageMetadata struct {
+			PromptTokenCount     int `json:"promptTokenCount"`
+			CandidatesTokenCount int `json:"candidatesTokenCount"`
+		} `json:"usageMetadata"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, fmt.Errorf("parsing gemini response: %w", err)
+	}
+	if len(raw.Candidates) == 0 {
+		return nil, fmt.Errorf("gemini returned no candidates")
+	}
+
+	candidate := raw.Candidates[0]
+	result := &LLMResponse{
+		StopReason: mapGeminiFinishReason(candidate.FinishReason),
+		Usage: Usage{
+			InputTokens:  raw.UsageMetadata.PromptTokenCount,
+			OutputTokens: raw.UsageMetadata.CandidatesTokenCount,
+		},
+	}
+
+	for i, part := range candidate.Content.Parts {
+		if part.Text != "" {
+			result.Content += part.Text
+		}
+		if part.FunctionCall != nil {
+			result.ToolCalls = append(result.ToolCalls, LLMTool{
+				ID:       fmt.Sprintf("gemini_%d", i),
+				Name:     part.FunctionCall.Name,
+				RawInput: part.FunctionCall.Args,
+			})
+		}
+	}
+
+	return result, nil
+}
+
+// mapGeminiFinishReason converts Gemini's finish reasons to our unified format.
+func mapGeminiFinishReason(reason string) string {
+	switch reason {
+	case "STOP":
+		return "end_turn"
+	case "MAX_TOKENS":
+		return "max_tokens"
+	case "SAFETY", "RECITATION", "OTHER":
+		return "end_turn"
+	default:
+		return "end_turn"
+	}
 }

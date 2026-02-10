@@ -196,6 +196,9 @@ func cmdRun() {
 		logger.Warn().Err(err).Msg("error loading some rules")
 	}
 
+	// Tell the engine where rules live so it can persist changes.
+	eng.SetRulesDir(rulesDir)
+
 	// Initialize response orchestrator.
 	executor := response.NewPlatformExecutor(logger)
 	orchestrator := response.NewOrchestrator(cfg.Response, executor, store, logger)
@@ -236,7 +239,16 @@ func cmdRun() {
 				aiAgent.RegisterTool(skills.NewIPReputationSkill(cfg.Skills.ThreatIntel.AbuseIPDBKey, logger))
 				aiAgent.RegisterTool(skills.NewHashReputationSkill(cfg.Skills.ThreatIntel.VirusTotalKey, logger))
 
-				logger.Info().Msg("AI agent initialized with 9 skills")
+				// Rule management skills.
+				aiAgent.RegisterTool(skills.NewListRulesSkill(eng, logger))
+				aiAgent.RegisterTool(skills.NewGetRuleSkill(eng, logger))
+				aiAgent.RegisterTool(skills.NewCreateRuleSkill(eng, logger))
+				aiAgent.RegisterTool(skills.NewUpdateRuleSkill(eng, logger))
+				aiAgent.RegisterTool(skills.NewDeleteRuleSkill(eng, logger))
+				aiAgent.RegisterTool(skills.NewEnableRuleSkill(eng, logger))
+				aiAgent.RegisterTool(skills.NewDisableRuleSkill(eng, logger))
+
+				logger.Info().Msg("AI agent initialized with 16 skills")
 
 				// Enable AI analysis routing in the detection engine.
 				if cfg.AI.AutoAnalyze {

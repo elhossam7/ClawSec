@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -252,8 +253,21 @@ func (s *Server) handleAuditLog(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleChatPage(w http.ResponseWriter, r *http.Request) {
+	agentStatus := ""
+	agentProvider := ""
+	toolCount := 0
+	if s.agent != nil {
+		health := s.agent.Health()
+		agentStatus, _ = health["status"].(string)
+		agentProvider, _ = health["provider"].(string)
+		toolCount = len(s.agent.ListTools())
+	}
+
 	data := map[string]interface{}{
-		"Tools": s.getAgentToolsList(),
+		"Tools":         s.getAgentToolsList(),
+		"AgentStatus":   agentStatus,
+		"AgentProvider": agentProvider,
+		"ToolCount":     toolCount,
 	}
 
 	if r.Header.Get("HX-Request") == "true" {
@@ -281,9 +295,9 @@ func (s *Server) handleAgentToolsPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := map[string]interface{}{
-		"Tools":    tools,
-		"Status":   agentStatus,
-		"Provider": provider,
+		"Tools":         tools,
+		"AgentStatus":   agentStatus,
+		"AgentProvider": provider,
 	}
 
 	if r.Header.Get("HX-Request") == "true" {
@@ -648,8 +662,15 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	response, toolCalls, err := s.agent.Chat(r.Context(), req.Message, req.SessionID)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("agent chat error")
+		errMsg := err.Error()
+		// Provide a user-friendly error for common API errors.
+		if contains429(errMsg) {
+			errMsg = "API rate limit exceeded. Please wait a moment and try again."
+		} else if len(errMsg) > 200 {
+			errMsg = errMsg[:200] + "..."
+		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(ChatResponse{Error: err.Error()})
+		json.NewEncoder(w).Encode(ChatResponse{Error: errMsg})
 		return
 	}
 
@@ -704,4 +725,9 @@ func (s *Server) handleAgentStream(w http.ResponseWriter, r *http.Request) {
 func (s *Server) BroadcastAgentEvent(eventType string, data interface{}) {
 	jsonData, _ := json.Marshal(data)
 	s.BroadcastEvent(eventType, string(jsonData))
+}
+
+// contains429 checks if an error string contains a 429 rate limit error.
+func contains429(s string) bool {
+	return strings.Contains(s, "429") || strings.Contains(s, "RESOURCE_EXHAUSTED") || strings.Contains(s, "rate limit") || strings.Contains(s, "quota")
 }

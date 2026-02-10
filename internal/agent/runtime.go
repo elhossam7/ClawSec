@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -127,6 +128,9 @@ func (a *Agent) TestConnection(ctx context.Context) error {
 }
 
 // callLLMWithRetry wraps LLM calls with exponential backoff retry logic.
+// On 429 / rate-limit errors it cycles through configured fallback models
+// before giving up, so the agent stays available if the primary model is
+// temporarily throttled.
 func (a *Agent) callLLMWithRetry(ctx context.Context, messages []Message, tools []ToolDef) (*LLMResponse, error) {
 	maxRetries := 3
 	var lastErr error
@@ -156,9 +160,51 @@ func (a *Agent) callLLMWithRetry(ctx context.Context, messages []Message, tools 
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			return nil, err
 		}
+
+		// On 429 / rate-limit, try fallback models instead of retrying the same one.
+		errStr := err.Error()
+		if strings.Contains(errStr, "429") || strings.Contains(errStr, "RESOURCE_EXHAUSTED") ||
+			strings.Contains(errStr, "rate limit") || strings.Contains(errStr, "quota") {
+			if resp, fbErr := a.tryFallbackModels(ctx, messages, tools, err); fbErr == nil {
+				return resp, nil
+			}
+			return nil, fmt.Errorf("rate limit exceeded (primary + all fallbacks failed): %w", err)
+		}
 	}
 
 	return nil, fmt.Errorf("LLM API call failed after %d retries: %w", maxRetries, lastErr)
+}
+
+// tryFallbackModels iterates through configured fallback models, attempting
+// each one in order. The original model is restored before returning.
+func (a *Agent) tryFallbackModels(ctx context.Context, messages []Message, tools []ToolDef, originalErr error) (*LLMResponse, error) {
+	fallbacks := a.cfg.FallbackModels
+	if len(fallbacks) == 0 {
+		return nil, fmt.Errorf("no fallback models configured")
+	}
+
+	originalModel := a.llm.GetModel()
+	defer a.llm.SetModel(originalModel) // always restore
+
+	for _, fb := range fallbacks {
+		if fb == originalModel {
+			continue // skip the model that already failed
+		}
+		a.logger.Info().
+			Str("primary", originalModel).
+			Str("fallback", fb).
+			Msg("primary model rate-limited, trying fallback")
+
+		a.llm.SetModel(fb)
+		resp, err := a.llm.Complete(ctx, messages, tools)
+		if err == nil {
+			a.logger.Info().Str("model", fb).Msg("fallback model succeeded")
+			return resp, nil
+		}
+		a.logger.Warn().Str("model", fb).Err(err).Msg("fallback model also failed")
+	}
+
+	return nil, fmt.Errorf("all %d fallback models failed", len(fallbacks))
 }
 
 // AnalyzeIncident performs AI-driven analysis of a security incident.
@@ -183,7 +229,7 @@ func (a *Agent) AnalyzeIncident(ctx context.Context, req types.AnalysisRequest) 
 	iterations := 0
 	maxIter := a.cfg.MaxToolCalls
 	if maxIter < 1 {
-		maxIter = 10
+		maxIter = 25
 	}
 
 	for iterations < maxIter {
@@ -321,7 +367,19 @@ func (a *Agent) Chat(ctx context.Context, query, sessionID string) (string, []ty
 		return resp.Content, allToolCalls, nil
 	}
 
-	return "", nil, fmt.Errorf("chat: max iterations reached")
+	// Max iterations reached — make one final call WITHOUT tools so the model
+	// can summarize what it found instead of returning a hard error.
+	a.logger.Warn().Int("iterations", iterations).Msg("max tool iterations reached, requesting final summary")
+	messages = append(messages, Message{
+		Role:    "user",
+		Content: "You have reached the maximum number of tool calls. Please provide your final answer now based on the information you have gathered so far. Do not call any more tools.",
+	})
+	resp, err := a.callLLMWithRetry(ctx, messages, nil) // nil tools = no tool calling
+	if err != nil {
+		return "", allToolCalls, fmt.Errorf("final summary after max iterations: %w", err)
+	}
+	a.memory.StoreContext(sessionID, resp.Content)
+	return resp.Content, allToolCalls, nil
 }
 
 // getToolDefs returns tool definitions in LLM-friendly format.

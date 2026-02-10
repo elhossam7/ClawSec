@@ -5,11 +5,14 @@ package engine
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/sentinel-agent/sentinel/internal/types"
+	"gopkg.in/yaml.v3"
 )
 
 // Engine is the core detection engine that processes log events against rules.
@@ -28,6 +31,7 @@ type Engine struct {
 
 	// AI agent integration
 	aiEnabled bool
+	rulesDir  string // Path to rules directory for file persistence
 }
 
 // Incident is an engine-level detection result.
@@ -274,4 +278,106 @@ func (e *Engine) GetRules() []*CompiledRule {
 		rules = append(rules, rule)
 	}
 	return rules
+}
+
+// SetRulesDir sets the directory where rules are persisted on disk.
+func (e *Engine) SetRulesDir(dir string) {
+	e.rulesDir = dir
+}
+
+// RulesDir returns the configured rules directory.
+func (e *Engine) RulesDir() string {
+	return e.rulesDir
+}
+
+// GetRule returns a single compiled rule by ID, or nil if not found.
+func (e *Engine) GetRule(id string) *CompiledRule {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.rules[id]
+}
+
+// AddRule compiles and adds a new rule to the engine, optionally persisting to disk.
+func (e *Engine) AddRule(raw Rule, persist bool) error {
+	compiled, err := CompileRule(raw)
+	if err != nil {
+		return fmt.Errorf("compiling rule: %w", err)
+	}
+
+	e.mu.Lock()
+	if _, exists := e.rules[raw.ID]; exists {
+		e.mu.Unlock()
+		return fmt.Errorf("rule %q already exists — use UpdateRule instead", raw.ID)
+	}
+	e.rules[raw.ID] = compiled
+	e.mu.Unlock()
+
+	if persist && e.rulesDir != "" {
+		if err := e.saveRuleFile(raw); err != nil {
+			return fmt.Errorf("rule added to engine but failed to persist: %w", err)
+		}
+	}
+
+	e.logger.Info().Str("rule", raw.ID).Msg("rule added")
+	return nil
+}
+
+// UpdateRule replaces an existing rule, re-compiles it, and optionally persists.
+func (e *Engine) UpdateRule(raw Rule, persist bool) error {
+	compiled, err := CompileRule(raw)
+	if err != nil {
+		return fmt.Errorf("compiling rule: %w", err)
+	}
+
+	e.mu.Lock()
+	if _, exists := e.rules[raw.ID]; !exists {
+		e.mu.Unlock()
+		return fmt.Errorf("rule %q not found — use AddRule to create it", raw.ID)
+	}
+	e.rules[raw.ID] = compiled
+	e.mu.Unlock()
+
+	if persist && e.rulesDir != "" {
+		if err := e.saveRuleFile(raw); err != nil {
+			return fmt.Errorf("rule updated in engine but failed to persist: %w", err)
+		}
+	}
+
+	e.logger.Info().Str("rule", raw.ID).Msg("rule updated")
+	return nil
+}
+
+// DeleteRule removes a rule from the engine and optionally deletes the file.
+func (e *Engine) DeleteRule(id string, deleteFile bool) error {
+	e.mu.Lock()
+	if _, exists := e.rules[id]; !exists {
+		e.mu.Unlock()
+		return fmt.Errorf("rule %q not found", id)
+	}
+	delete(e.rules, id)
+	e.mu.Unlock()
+
+	if deleteFile && e.rulesDir != "" {
+		path := filepath.Join(e.rulesDir, id+".yml")
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("rule removed from engine but failed to delete file: %w", err)
+		}
+	}
+
+	e.logger.Info().Str("rule", id).Msg("rule deleted")
+	return nil
+}
+
+// saveRuleFile marshals a Rule to YAML and writes it to the rules directory.
+func (e *Engine) saveRuleFile(rule Rule) error {
+	data, err := yaml.Marshal(&rule)
+	if err != nil {
+		return fmt.Errorf("marshalling rule YAML: %w", err)
+	}
+
+	path := filepath.Join(e.rulesDir, rule.ID+".yml")
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("writing rule file %s: %w", path, err)
+	}
+	return nil
 }

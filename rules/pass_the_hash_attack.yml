@@ -1,0 +1,20 @@
+id: pass_the_hash_attack
+title: Pass-the-Hash Attack Detection
+description: Detects Pass-the-Hash attacks by identifying multiple logins from the same account with different source IPs, unusual authentication patterns, and lateral movement indicators. Pass-the-hash attacks allow attackers to move laterally without knowing the actual password.
+severity: critical
+status: active
+author: sentinel-ai
+tags:
+    - attack.t1078
+    - attack.credential_access
+    - active_directory
+    - pass_the_hash
+logsource:
+    category: auth
+    product: ""
+    service: ""
+detection:
+    selection:
+        raw|contains: logon type 9
+        source_ip|re: ^192\.168\.|^10\.|^172\.(1[6-9]|2[0-9]|3[01])\.
+    condition: selection

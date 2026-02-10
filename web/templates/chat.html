@@ -17,12 +17,12 @@
                 </div>
                 <div class="chat-header-actions">
                     <span class="agent-provider-badge" id="chat-provider">
-                        {{if .AgentStatus}}
-                            <span class="status-dot-sm {{if eq .AgentStatus "healthy"}}online{{else}}offline{{end}}"></span>
+                        {{if eq .AgentStatus "healthy"}}
+                            <span class="status-dot-sm online"></span>
                             {{.AgentProvider}}
                         {{else}}
                             <span class="status-dot-sm offline"></span>
-                            Disabled
+                            DISABLED
                         {{end}}
                     </span>
                     <button class="btn btn-ghost btn-sm" onclick="clearChat()" title="Clear conversation">
@@ -35,8 +35,8 @@
 
             <div class="chat-messages" id="chat-messages">
                 <!-- Welcome message -->
-                <div class="chat-msg chat-msg-system">
-                    <div class="chat-msg-avatar system-avatar">
+                <div class="chat-msg system chat-welcome">
+                    <div class="chat-msg-avatar">
                         <svg viewBox="0 0 36 36" fill="none"><path d="M18 2L4 9v9c0 8.3 5.9 16 14 18 8.1-2 14-9.7 14-18V9L18 2z" stroke="#00d4ff" stroke-width="1.5" fill="rgba(0,212,255,0.1)"/><circle cx="18" cy="17" r="3" fill="#00d4ff"/></svg>
                     </div>
                     <div class="chat-msg-body">
@@ -86,9 +86,8 @@
                 </div>
             </div>
             <div class="card-body-flush" id="agent-status-panel"
-                 hx-get="/api/health/agent" hx-trigger="load, every 15s"
-                 hx-target="#agent-status-panel" hx-swap="innerHTML"
-                 hx-select=".agent-status-detail">
+                 hx-get="/partials/agent-status" hx-trigger="load, every 15s"
+                 hx-target="#agent-status-panel" hx-swap="innerHTML">
                 <div class="agent-status-detail">
                     <div class="info-list">
                         <div class="info-item">

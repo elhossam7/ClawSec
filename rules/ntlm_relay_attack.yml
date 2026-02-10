@@ -1,0 +1,19 @@
+id: ntlm_relay_attack
+title: NTLM Relay Attack Detected
+description: Detects potential NTLM relay attacks by identifying NTLM authentication requests from internal hosts to unusual external destinations, indicating credential relay attempts
+severity: high
+status: active
+author: sentinel-ai
+tags:
+    - attack.t1071
+    - attack.t1566.001
+    - credential_access
+    - ntlm_relay
+logsource:
+    category: network
+    product: ""
+    service: ""
+detection:
+    selection:
+        raw|contains: NTLM
+    condition: selection

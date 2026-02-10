@@ -302,13 +302,17 @@
       .then(function (res) { return res.json(); })
       .then(function (data) {
         removeTypingIndicator();
+        if (data.error) {
+          appendChatMsg('system', 'System', 'Error: ' + data.error);
+          return;
+        }
         if (data.response) {
           appendChatMsg('assistant', 'Sentinel AI', data.response);
         }
-        if (data.tool_calls && data.tool_calls.length > 0) {
-          var toolSummary = data.tool_calls.map(function (tc) {
-            return '🔧 ' + tc.tool_name;
-          }).join('\n');
+        if (data.tools_used && data.tools_used.length > 0) {
+          var toolSummary = data.tools_used.map(function (t) {
+            return '\uD83D\uDD27 ' + t;
+          }).join(', ');
           appendChatMsg('system', 'System', 'Tools invoked: ' + toolSummary);
         }
       })

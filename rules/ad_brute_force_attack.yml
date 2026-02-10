@@ -1,0 +1,20 @@
+id: ad_brute_force_attack
+title: Active Directory Brute Force Attack Detection
+description: Detects brute force attacks against Active Directory authentication services including multiple failed login attempts to LDAP, Kerberos, and domain controllers
+severity: high
+status: active
+author: sentinel-ai
+tags:
+    - attack.t1110
+    - attack.credential_access
+    - active_directory
+logsource:
+    category: auth
+    product: ""
+    service: ""
+detection:
+    selection:
+        event_id|contains: "4768"
+        raw|contains: Failed password
+        source_ip|re: ^10\.|^172\.(1[6-9]|2[0-9]|3[01])\.|^192\.168\.
+    condition: selection

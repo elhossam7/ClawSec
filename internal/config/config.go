@@ -123,10 +123,13 @@ type LoggingConfig struct {
 
 // AIConfig configures the LLM-powered agent runtime.
 type AIConfig struct {
-	Provider string `yaml:"provider"` // "anthropic", "openai", "ollama"
+	Provider string `yaml:"provider"` // "anthropic", "openai", "ollama", "gemini"
 	APIKey   string `yaml:"api_key"`  // Or use env var: ${ANTHROPIC_API_KEY}
 	Model    string `yaml:"model"`    // e.g. "claude-sonnet-4-20250514"
 	Endpoint string `yaml:"endpoint"` // For ollama / custom endpoint
+
+	// Fallback models tried in order when the primary model returns 429 / rate-limit.
+	FallbackModels []string `yaml:"fallback_models,omitempty"`
 
 	// Behaviour
 	AutoAnalyze  bool    `yaml:"auto_analyze"`   // Analyse all incidents automatically
@@ -317,10 +320,10 @@ func (c *Config) Validate() error {
 	// Validate AI config when a provider is set.
 	if c.AI.Provider != "" {
 		switch c.AI.Provider {
-		case "anthropic", "openai", "ollama":
+		case "anthropic", "openai", "ollama", "gemini":
 			// ok
 		default:
-			return fmt.Errorf("ai.provider must be 'anthropic', 'openai', or 'ollama', got %q", c.AI.Provider)
+			return fmt.Errorf("ai.provider must be 'anthropic', 'openai', 'ollama', or 'gemini', got %q", c.AI.Provider)
 		}
 		if c.AI.Provider != "ollama" && c.AI.APIKey == "" {
 			return fmt.Errorf("ai.api_key is required for provider %q", c.AI.Provider)
