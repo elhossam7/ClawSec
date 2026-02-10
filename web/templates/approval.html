@@ -1,0 +1,101 @@
+{{define "approval-content"}}
+<!-- Pending Actions -->
+<div class="bg-white shadow rounded-lg mb-8">
+    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+        <h3 class="text-lg font-medium leading-6 text-gray-900">
+            Pending Approval
+            <span class="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
+                {{len .Pending}}
+            </span>
+        </h3>
+        <p class="mt-1 text-sm text-gray-500">Review and approve or deny proposed response actions.</p>
+    </div>
+
+    {{if .Pending}}
+    <div class="divide-y divide-gray-200">
+        {{range .Pending}}
+        <div class="p-6" id="action-{{.ID}}">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <div class="flex items-center space-x-3 mb-2">
+                        {{severityBadge .Severity}}
+                        <span class="text-sm font-medium text-gray-900 uppercase">{{.Type}}</span>
+                        <span class="text-sm text-gray-500">Target: <code class="bg-gray-100 px-1 rounded">{{.Target}}</code></span>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-2">{{.Reason}}</p>
+                    <div class="text-xs text-gray-400 space-x-4">
+                        <span>Rule: {{.RuleID}}</span>
+                        <span>Created: {{timeAgo .CreatedAt}}</span>
+                        <span>Expires: {{timeAgo .ExpiresAt}}</span>
+                    </div>
+                </div>
+                <div class="flex space-x-2 ml-4">
+                    <button hx-post="/api/approve/{{.ID}}" hx-target="#main-content" hx-swap="innerHTML"
+                            class="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500">
+                        &#10003; Approve
+                    </button>
+                    <button hx-post="/api/deny/{{.ID}}" hx-target="#main-content" hx-swap="innerHTML"
+                            class="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500">
+                        &#10007; Deny
+                    </button>
+                </div>
+            </div>
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <div class="p-12 text-center text-gray-500">
+        <span class="text-4xl block mb-4">&#9989;</span>
+        <p class="text-lg font-medium">No pending actions</p>
+        <p class="text-sm">All clear! No response actions require approval.</p>
+    </div>
+    {{end}}
+</div>
+
+<!-- Recent Actions History -->
+<div class="bg-white shadow rounded-lg">
+    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+        <h3 class="text-lg font-medium leading-6 text-gray-900">Recent Actions</h3>
+    </div>
+    {{if .Recent}}
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Target</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Approved By</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {{range .Recent}}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{.Type}}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{{.Target}}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">{{statusBadge (printf "%s" .Status)}}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{.ApprovedBy}}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{timeAgo .CreatedAt}}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        {{if eq (printf "%s" .Status) "executed"}}
+                        <button hx-post="/api/rollback/{{.ID}}" hx-target="#main-content" hx-swap="innerHTML"
+                                hx-confirm="Are you sure you want to rollback this action?"
+                                class="text-purple-600 hover:text-purple-900 font-medium">
+                            Rollback
+                        </button>
+                        {{end}}
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+    {{else}}
+    <div class="p-8 text-center text-gray-500">
+        <p>No actions recorded yet.</p>
+    </div>
+    {{end}}
+</div>
+{{end}}

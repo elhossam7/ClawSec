@@ -1,0 +1,127 @@
+{{define "dashboard-content"}}
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <span class="text-2xl">&#128202;</span>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Total Events</dt>
+                        <dd class="text-lg font-semibold text-gray-900">{{.EventCount}}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <span class="text-2xl">&#9888;</span>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Open Incidents</dt>
+                        <dd class="text-lg font-semibold text-red-600">{{len .Incidents}}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <span class="text-2xl">&#9203;</span>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Pending Actions</dt>
+                        <dd class="text-lg font-semibold text-yellow-600">{{len .PendingActions}}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <span class="text-2xl">&#128736;</span>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Active Rules</dt>
+                        <dd class="text-lg font-semibold text-gray-900">{{.ActiveRules}}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Active Incidents -->
+{{if .Incidents}}
+<div class="bg-white shadow rounded-lg mb-8">
+    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+        <h3 class="text-lg font-medium leading-6 text-gray-900">Active Incidents</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Severity</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source IP</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {{range .Incidents}}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">{{severityBadge .Severity}}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{.Title}}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{{.SourceIP}}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">{{statusBadge (printf "%s" .Status)}}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{timeAgo .CreatedAt}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+</div>
+{{end}}
+
+<!-- Recent Events (Live Stream) -->
+<div class="bg-white shadow rounded-lg">
+    <div class="px-4 py-5 sm:px-6 border-b border-gray-200 flex justify-between items-center">
+        <h3 class="text-lg font-medium leading-6 text-gray-900">Event Stream</h3>
+        <span class="inline-flex items-center text-xs text-green-600">
+            <span class="animate-pulse w-2 h-2 bg-green-400 rounded-full mr-1"></span>
+            Live
+        </span>
+    </div>
+    <div id="event-stream" class="max-h-96 overflow-y-auto" sse-swap="new_event" hx-swap="afterbegin">
+        {{range .Events}}
+        <div class="px-4 py-3 border-b border-gray-100 hover:bg-gray-50 text-sm">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    {{severityBadge .Severity}}
+                    <span class="text-gray-500 font-mono text-xs">{{.Source}}</span>
+                    <span class="text-gray-400 text-xs">{{.Category}}</span>
+                </div>
+                <span class="text-gray-400 text-xs">{{timeAgo .Timestamp}}</span>
+            </div>
+            <p class="mt-1 text-gray-700 font-mono text-xs truncate">{{.Raw}}</p>
+        </div>
+        {{end}}
+    </div>
+</div>
+{{end}}

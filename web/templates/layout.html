@@ -1,0 +1,83 @@
+{{define "layout"}}
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentinel - {{.Title}}</title>
+    <script src="https://unpkg.com/htmx.org@2.0.0"></script>
+    <script src="https://unpkg.com/htmx-ext-sse@2.0.0/sse.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="h-full" hx-ext="sse" sse-connect="/api/events/stream">
+    <div class="min-h-full">
+        <!-- Navigation -->
+        <nav class="bg-gray-900">
+            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div class="flex h-16 items-center justify-between">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <span class="text-2xl font-bold text-green-400">&#9737; Sentinel</span>
+                        </div>
+                        <div class="ml-10 flex items-baseline space-x-4">
+                            <a href="/" hx-get="/" hx-target="#main-content" hx-push-url="true"
+                               class="nav-link {{if eq .Page "dashboard"}}active{{end}} rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white">
+                                Dashboard
+                            </a>
+                            <a href="/approval" hx-get="/approval" hx-target="#main-content" hx-push-url="true"
+                               class="nav-link {{if eq .Page "approval"}}active{{end}} rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white">
+                                Approval Queue
+                                <span id="pending-badge" class="ml-1 inline-flex items-center rounded-full bg-red-600 px-2 py-0.5 text-xs font-medium text-white"
+                                      sse-swap="pending_count" hx-swap="innerHTML"></span>
+                            </a>
+                            <a href="/incidents" hx-get="/incidents" hx-target="#main-content" hx-push-url="true"
+                               class="nav-link {{if eq .Page "incidents"}}active{{end}} rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white">
+                                Incidents
+                            </a>
+                            <a href="/rules" hx-get="/rules" hx-target="#main-content" hx-push-url="true"
+                               class="nav-link {{if eq .Page "rules"}}active{{end}} rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white">
+                                Rules
+                            </a>
+                            <a href="/audit" hx-get="/audit" hx-target="#main-content" hx-push-url="true"
+                               class="nav-link {{if eq .Page "audit"}}active{{end}} rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white">
+                                Audit Log
+                            </a>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-xs text-gray-400">
+                            <span class="inline-block w-2 h-2 rounded-full bg-green-400 mr-1"></span>
+                            Agent Active
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main>
+            <div class="mx-auto max-w-7xl py-6 sm:px-6 lg:px-8" id="main-content">
+                {{template "page-content" .}}
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast notifications via SSE -->
+    <div id="toast-container" class="fixed bottom-4 right-4 space-y-2 z-50"
+         sse-swap="notification" hx-swap="beforeend">
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
+{{end}}
+
+{{define "page-content"}}
+    {{if eq .Page "dashboard"}}{{template "dashboard-content" .Content}}
+    {{else if eq .Page "approval"}}{{template "approval-content" .Content}}
+    {{else if eq .Page "rules"}}{{template "rules-content" .Content}}
+    {{else if eq .Page "incidents"}}{{template "incidents-content" .Content}}
+    {{else if eq .Page "audit"}}{{template "audit-content" .Content}}
+    {{end}}
+{{end}}

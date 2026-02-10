@@ -1,0 +1,150 @@
+{{define "rules-content"}}
+<div class="bg-white shadow rounded-lg">
+    <div class="px-4 py-5 sm:px-6 border-b border-gray-200 flex justify-between items-center">
+        <div>
+            <h3 class="text-lg font-medium leading-6 text-gray-900">Detection Rules</h3>
+            <p class="mt-1 text-sm text-gray-500">SIGMA-compatible detection rules with Sentinel response extensions.</p>
+        </div>
+        <span class="text-sm text-gray-500">{{len .Rules}} rules loaded</span>
+    </div>
+    
+    {{if .Rules}}
+    <div class="divide-y divide-gray-200">
+        {{range .Rules}}
+        <div class="p-6 hover:bg-gray-50">
+            <div class="flex items-center justify-between">
+                <div class="flex-1">
+                    <div class="flex items-center space-x-3 mb-1">
+                        {{severityBadge .Severity}}
+                        <h4 class="text-sm font-medium text-gray-900">{{.Title}}</h4>
+                        {{if not .Enabled}}
+                        <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">disabled</span>
+                        {{end}}
+                    </div>
+                    <p class="text-sm text-gray-500 mb-2">{{.Description}}</p>
+                    <div class="flex items-center space-x-4 text-xs text-gray-400">
+                        <span>ID: <code class="bg-gray-100 px-1 rounded">{{.ID}}</code></span>
+                        {{if .Tags}}
+                        <span>Tags: 
+                            {{range .Tags}}
+                            <span class="inline-flex items-center rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700 mr-1">{{.}}</span>
+                            {{end}}
+                        </span>
+                        {{end}}
+                        {{if .Correlation}}
+                        <span>Threshold: {{.Correlation.Threshold}} in {{.Correlation.Window}}</span>
+                        {{end}}
+                    </div>
+                </div>
+                <div class="ml-4">
+                    {{if .Enabled}}
+                    <button hx-post="/api/rules/toggle/{{.ID}}" hx-vals='{"action":"disable"}' hx-target="#main-content" hx-swap="innerHTML"
+                            class="inline-flex items-center rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">
+                        Disable
+                    </button>
+                    {{else}}
+                    <button hx-post="/api/rules/toggle/{{.ID}}" hx-vals='{"action":"enable"}' hx-target="#main-content" hx-swap="innerHTML"
+                            class="inline-flex items-center rounded-md bg-green-100 px-3 py-2 text-sm font-medium text-green-700 hover:bg-green-200">
+                        Enable
+                    </button>
+                    {{end}}
+                </div>
+            </div>
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <div class="p-12 text-center text-gray-500">
+        <span class="text-4xl block mb-4">&#128220;</span>
+        <p class="text-lg font-medium">No rules loaded</p>
+        <p class="text-sm">Add SIGMA-compatible YAML rules to the rules directory.</p>
+    </div>
+    {{end}}
+</div>
+{{end}}
+
+{{define "incidents-content"}}
+<div class="bg-white shadow rounded-lg">
+    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+        <h3 class="text-lg font-medium leading-6 text-gray-900">Incidents</h3>
+        <p class="mt-1 text-sm text-gray-500">Security incidents detected by the engine.</p>
+    </div>
+    
+    {{if .Incidents}}
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Severity</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rule</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source IP</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Events</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {{range .Incidents}}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">{{severityBadge .Severity}}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{.Title}}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{{.RuleID}}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{{.SourceIP}}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">{{statusBadge (printf "%s" .Status)}}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{len .Events}}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{timeAgo .CreatedAt}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+    {{else}}
+    <div class="p-12 text-center text-gray-500">
+        <span class="text-4xl block mb-4">&#128737;</span>
+        <p class="text-lg font-medium">No incidents</p>
+        <p class="text-sm">No security incidents have been recorded.</p>
+    </div>
+    {{end}}
+</div>
+{{end}}
+
+{{define "audit-content"}}
+<div class="bg-white shadow rounded-lg">
+    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+        <h3 class="text-lg font-medium leading-6 text-gray-900">Audit Log</h3>
+        <p class="mt-1 text-sm text-gray-500">Every action taken by Sentinel is recorded here.</p>
+    </div>
+    
+    {{if .Entries}}
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Timestamp</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actor</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {{range .Entries}}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{timeAgo .Timestamp}}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{.Action}}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{.Actor}}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500 max-w-md truncate">{{.Details}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+    {{else}}
+    <div class="p-12 text-center text-gray-500">
+        <span class="text-4xl block mb-4">&#128203;</span>
+        <p class="text-lg font-medium">No audit entries</p>
+        <p class="text-sm">Actions will appear here as they occur.</p>
+    </div>
+    {{end}}
+</div>
+{{end}}
