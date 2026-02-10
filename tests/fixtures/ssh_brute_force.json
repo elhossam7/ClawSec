@@ -1,0 +1,23 @@
+{
+  "type": "ssh_brute_force",
+  "description": "Simulated SSH brute force attack from external IP",
+  "source": "auth.log",
+  "events": [
+    {"timestamp": "2026-02-10T10:00:01Z", "raw": "Feb 10 10:00:01 server sshd[1234]: Failed password for root from 203.0.113.5 port 50001 ssh2", "fields": {"source_ip": "203.0.113.5", "username": "root", "action": "failed_login", "service": "sshd"}},
+    {"timestamp": "2026-02-10T10:00:02Z", "raw": "Feb 10 10:00:02 server sshd[1234]: Failed password for root from 203.0.113.5 port 50002 ssh2", "fields": {"source_ip": "203.0.113.5", "username": "root", "action": "failed_login", "service": "sshd"}},
+    {"timestamp": "2026-02-10T10:00:03Z", "raw": "Feb 10 10:00:03 server sshd[1234]: Failed password for root from 203.0.113.5 port 50003 ssh2", "fields": {"source_ip": "203.0.113.5", "username": "root", "action": "failed_login", "service": "sshd"}},
+    {"timestamp": "2026-02-10T10:00:04Z", "raw": "Feb 10 10:00:04 server sshd[1234]: Failed password for root from 203.0.113.5 port 50004 ssh2", "fields": {"source_ip": "203.0.113.5", "username": "root", "action": "failed_login", "service": "sshd"}},
+    {"timestamp": "2026-02-10T10:00:05Z", "raw": "Feb 10 10:00:05 server sshd[1234]: Failed password for root from 203.0.113.5 port 50005 ssh2", "fields": {"source_ip": "203.0.113.5", "username": "root", "action": "failed_login", "service": "sshd"}}
+  ],
+  "expected": {
+    "rule_match": "ssh_brute_force",
+    "severity": "high",
+    "ai_analysis": {
+      "recommendation": "block_ip",
+      "target": "203.0.113.5",
+      "min_confidence": 0.8,
+      "max_risk": 7,
+      "requires_human": false
+    }
+  }
+}

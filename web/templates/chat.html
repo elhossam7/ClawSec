@@ -1,0 +1,225 @@
+{{define "chat-content"}}
+<!-- ═══ AI SOC Analyst Chat ═══ -->
+<div class="chat-layout">
+
+    <!-- Chat Panel (main) -->
+    <div class="chat-panel">
+        <div class="card chat-card">
+            <div class="card-header">
+                <div>
+                    <div class="card-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                        </svg>
+                        SOC Analyst Chat
+                    </div>
+                    <div class="card-subtitle">Ask the AI agent to investigate, analyze, or explain security events</div>
+                </div>
+                <div class="chat-header-actions">
+                    <span class="agent-provider-badge" id="chat-provider">
+                        {{if .AgentStatus}}
+                            <span class="status-dot-sm {{if eq .AgentStatus "healthy"}}online{{else}}offline{{end}}"></span>
+                            {{.AgentProvider}}
+                        {{else}}
+                            <span class="status-dot-sm offline"></span>
+                            Disabled
+                        {{end}}
+                    </span>
+                    <button class="btn btn-ghost btn-sm" onclick="clearChat()" title="Clear conversation">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="chat-messages" id="chat-messages">
+                <!-- Welcome message -->
+                <div class="chat-msg chat-msg-system">
+                    <div class="chat-msg-avatar system-avatar">
+                        <svg viewBox="0 0 36 36" fill="none"><path d="M18 2L4 9v9c0 8.3 5.9 16 14 18 8.1-2 14-9.7 14-18V9L18 2z" stroke="#00d4ff" stroke-width="1.5" fill="rgba(0,212,255,0.1)"/><circle cx="18" cy="17" r="3" fill="#00d4ff"/></svg>
+                    </div>
+                    <div class="chat-msg-body">
+                        <div class="chat-msg-name">Sentinel AI</div>
+                        <div class="chat-msg-text">
+                            I'm your AI SOC analyst. I can investigate incidents, check IPs, search logs, analyze threats, and recommend defensive actions. What would you like to investigate?
+                        </div>
+                        <div class="chat-suggestions">
+                            <button class="chat-suggestion" onclick="sendSuggestion(this)">Analyze recent incidents</button>
+                            <button class="chat-suggestion" onclick="sendSuggestion(this)">Check IP 203.0.113.5</button>
+                            <button class="chat-suggestion" onclick="sendSuggestion(this)">Show active threats</button>
+                            <button class="chat-suggestion" onclick="sendSuggestion(this)">What rules are firing?</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-input-area">
+                <div class="chat-input-wrap">
+                    <textarea id="chat-input" class="chat-input" rows="1"
+                        placeholder="Ask the agent to investigate something..."
+                        onkeydown="handleChatKeydown(event)"
+                        oninput="autoResizeTextarea(this)"></textarea>
+                    <button class="chat-send-btn" id="chat-send-btn" onclick="sendChatMessage()" title="Send message (Enter)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="chat-input-hint">
+                    <span>Enter to send · Shift+Enter for new line · Tools: <span class="mono-text" id="chat-tool-count">{{.ToolCount}}</span> available</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Context Sidebar -->
+    <div class="chat-sidebar">
+        <!-- Agent Status -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>
+                    </svg>
+                    Agent Status
+                </div>
+            </div>
+            <div class="card-body-flush" id="agent-status-panel"
+                 hx-get="/api/health/agent" hx-trigger="load, every 15s"
+                 hx-target="#agent-status-panel" hx-swap="innerHTML"
+                 hx-select=".agent-status-detail">
+                <div class="agent-status-detail">
+                    <div class="info-list">
+                        <div class="info-item">
+                            <span class="info-item-label">Status</span>
+                            <span class="info-item-value info-val-success">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Available Tools -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9"/>
+                    </svg>
+                    Available Tools
+                </div>
+            </div>
+            <div class="card-body-flush">
+                {{if .Tools}}
+                <div class="tool-list">
+                    {{range .Tools}}
+                    <div class="tool-item">
+                        <div class="tool-name">{{.Name}}</div>
+                        <div class="tool-desc">{{.Description}}</div>
+                    </div>
+                    {{end}}
+                </div>
+                {{else}}
+                <div class="empty-state" style="padding: 24px;">
+                    <div class="empty-state-desc">No AI tools available. Configure an LLM provider in sentinel.yaml.</div>
+                </div>
+                {{end}}
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                    </svg>
+                    Quick Queries
+                </div>
+            </div>
+            <div class="card-body" style="padding: 12px;">
+                <div class="quick-queries">
+                    <button class="quick-query-btn" onclick="sendSuggestion(this)">Summarize open incidents</button>
+                    <button class="quick-query-btn" onclick="sendSuggestion(this)">Check 10.0.0.0/8 activity</button>
+                    <button class="quick-query-btn" onclick="sendSuggestion(this)">List blocked IPs today</button>
+                    <button class="quick-query-btn" onclick="sendSuggestion(this)">Show top attack sources</button>
+                    <button class="quick-query-btn" onclick="sendSuggestion(this)">Explain last critical alert</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}}
+
+{{define "agent-tools-content"}}
+<!-- ═══ Agent Tools & Skills ═══ -->
+<div class="stats-grid" style="grid-template-columns: repeat(3, 1fr);">
+    <div class="stat-card" style="--stat-accent: var(--accent); --stat-icon-bg: rgba(0,212,255,0.08);">
+        <div class="stat-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09"/></svg>
+        </div>
+        <div class="stat-card-value" data-counter="{{len .Tools}}">{{len .Tools}}</div>
+        <div class="stat-card-label">Registered Skills</div>
+    </div>
+    <div class="stat-card" style="--stat-accent: var(--color-success); --stat-icon-bg: rgba(16,185,129,0.08);">
+        <div class="stat-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <div class="stat-card-value">{{.AgentStatus}}</div>
+        <div class="stat-card-label">Agent Status</div>
+    </div>
+    <div class="stat-card" style="--stat-accent: var(--color-info); --stat-icon-bg: rgba(59,130,246,0.08);">
+        <div class="stat-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <div class="stat-card-value">{{.AgentProvider}}</div>
+        <div class="stat-card-label">LLM Provider</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div>
+            <div class="card-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06"/>
+                </svg>
+                Agent Skills
+            </div>
+            <div class="card-subtitle">Tools available to the AI agent for automated investigation and response</div>
+        </div>
+        <span class="mono-text" style="font-size: 0.72rem; color: var(--text-muted);">{{len .Tools}} registered</span>
+    </div>
+    {{if .Tools}}
+    <div class="card-body-flush">
+        {{range .Tools}}
+        <div class="tool-detail-item">
+            <div class="tool-detail-header">
+                <span class="tool-detail-name">{{.Name}}</span>
+            </div>
+            <p class="tool-detail-desc">{{.Description}}</p>
+            {{if .InputSchema}}
+            <div class="tool-detail-schema">
+                <span class="tool-schema-label">Parameters:</span>
+                <code class="tool-schema-code">{{jsonMarshal .InputSchema}}</code>
+            </div>
+            {{end}}
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <div class="empty-state">
+        <div class="empty-state-icon" style="background: rgba(0,212,255,0.06);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+            </svg>
+        </div>
+        <div class="empty-state-title">No AI Tools</div>
+        <div class="empty-state-desc">Configure an LLM provider in sentinel.yaml to enable AI agent tools</div>
+    </div>
+    {{end}}
+</div>
+{{end}}

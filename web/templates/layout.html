@@ -64,6 +64,25 @@
                           sse-swap="pending_count" hx-swap="innerHTML"></span>
                 </a>
 
+                <div class="nav-section-label">AI Agent</div>
+
+                <a href="/chat" hx-get="/chat" hx-target="#main-content" hx-push-url="true"
+                   class="nav-item {{if eq .Page "chat"}}active{{end}}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                    </svg>
+                    SOC Chat
+                </a>
+
+                <a href="/agent/tools" hx-get="/agent/tools" hx-target="#main-content" hx-push-url="true"
+                   class="nav-item {{if eq .Page "agent-tools"}}active{{end}}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+                    </svg>
+                    Agent Tools
+                </a>
+
                 <div class="nav-section-label">Configure</div>
 
                 <a href="/rules" hx-get="/rules" hx-target="#main-content" hx-push-url="true"
@@ -89,11 +108,16 @@
             </nav>
 
             <div class="sidebar-footer">
-                <div class="agent-status">
-                    <div class="status-dot"></div>
-                    <div>
-                        <div class="agent-status-text">Agent Active</div>
-                        <div class="agent-status-sub">Real-time monitoring</div>
+                <div class="agent-status" id="sidebar-agent-status"
+                     hx-get="/api/health/agent" hx-trigger="load, every 30s"
+                     hx-target="#sidebar-agent-status" hx-swap="innerHTML"
+                     hx-select=".agent-status-inner">
+                    <div class="agent-status-inner">
+                        <div class="status-dot"></div>
+                        <div>
+                            <div class="agent-status-text">Agent Active</div>
+                            <div class="agent-status-sub">Real-time monitoring</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -150,5 +174,7 @@
     {{else if eq .Page "rules"}}{{template "rules-content" .Content}}
     {{else if eq .Page "incidents"}}{{template "incidents-content" .Content}}
     {{else if eq .Page "audit"}}{{template "audit-content" .Content}}
+    {{else if eq .Page "chat"}}{{template "chat-content" .Content}}
+    {{else if eq .Page "agent-tools"}}{{template "agent-tools-content" .Content}}
     {{end}}
 {{end}}

@@ -1,0 +1,20 @@
+{
+  "type": "sqli_high_risk",
+  "description": "SQL injection from external IP — high-risk action should require human review",
+  "source": "web.log",
+  "events": [
+    {"timestamp": "2026-02-10T12:00:01Z", "raw": "203.0.113.50 - - [10/Feb/2026:12:00:01 +0000] \"GET /login?user=admin' OR 1=1-- HTTP/1.1\" 200 1234", "fields": {"source_ip": "203.0.113.50", "method": "GET", "path": "/login", "query": "user=admin' OR 1=1--", "status": "200", "category": "web"}}
+  ],
+  "expected": {
+    "rule_match": "sqli_detection",
+    "severity": "critical",
+    "ai_analysis": {
+      "recommendation": "block_ip",
+      "target": "203.0.113.50",
+      "min_confidence": 0.7,
+      "max_risk": 10,
+      "note": "Critical severity with high risk should escalate to human",
+      "requires_human": true
+    }
+  }
+}

@@ -46,6 +46,10 @@ func main() {
 		fmt.Printf("Sentinel %s (built %s)\n", Version, BuildTime)
 	case "rules":
 		cmdRules()
+	case "validate-config":
+		cmdValidateConfig()
+	case "test-llm":
+		cmdTestLLM()
 	case "help", "--help", "-h":
 		printUsage()
 	default:
@@ -62,12 +66,14 @@ Usage:
   sentinel <command> [options]
 
 Commands:
-  init       Initialize configuration and database
-  run        Start the agent (main daemon)
-  status     Show agent health and queue status
-  rules      Manage detection rules (list, enable, disable)
-  version    Print version information
-  help       Show this help
+  init              Initialize configuration and database
+  run               Start the agent (main daemon)
+  status            Show agent health and queue status
+  rules             Manage detection rules (list, enable, disable)
+  validate-config   Validate sentinel.yaml configuration
+  test-llm          Test LLM provider connectivity
+  version           Print version information
+  help              Show this help
 
 Run 'sentinel run' to start monitoring. The WebUI will be available at http://127.0.0.1:8080
 
@@ -238,14 +244,46 @@ func cmdRun() {
 
 					// Start analysis worker goroutine.
 					go func() {
+						consecutiveFailures := 0
+						const maxConsecutiveFailures = 5
+
 						for {
 							select {
 							case req := <-eng.AnalysisQueue():
 								result, err := aiAgent.AnalyzeIncident(ctx, req)
 								if err != nil {
-									logger.Error().Err(err).Str("incident", req.Incident.ID).Msg("AI analysis failed")
+									consecutiveFailures++
+									logger.Error().
+										Err(err).
+										Str("incident", req.Incident.ID).
+										Int("consecutive_failures", consecutiveFailures).
+										Msg("AI analysis failed, falling back to SIGMA action")
+
+									// Fallback: queue the SIGMA-defined action directly.
+									fallbackAction := types.ResponseAction{
+										Type:     "alert_admin",
+										Status:   types.ActionPending,
+										Target:   req.Incident.SourceIP,
+										Reason:   fmt.Sprintf("[AI fallback] %s (LLM unavailable)", req.Incident.Title),
+										RuleID:   req.Incident.RuleID,
+										Severity: req.Incident.Severity,
+									}
+									if qErr := orchestrator.QueueAction(fallbackAction); qErr != nil {
+										logger.Error().Err(qErr).Msg("failed to queue fallback action")
+									}
+
+									// If too many consecutive failures, log a warning about degraded mode.
+									if consecutiveFailures >= maxConsecutiveFailures {
+										logger.Warn().
+											Int("failures", consecutiveFailures).
+											Msg("AI agent in degraded mode — multiple consecutive LLM failures, falling back to SIGMA rules")
+									}
 									continue
 								}
+
+								// Reset failure counter on success.
+								consecutiveFailures = 0
+
 								// Submit proposals to orchestrator.
 								for _, proposal := range result.ProposedActions {
 									if err := orchestrator.SubmitProposal(proposal); err != nil {
@@ -499,3 +537,82 @@ func setupLogger(cfg config.LoggingConfig) zerolog.Logger {
 
 // webServer is a package-level reference for wiring SSE broadcasts.
 var webServer *gateway.Server
+
+// cmdValidateConfig checks sentinel.yaml for errors without starting the daemon.
+func cmdValidateConfig() {
+	cfg, err := config.Load("sentinel.yaml")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "✗ Configuration invalid: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("Configuration valid ✓")
+	fmt.Printf("  Platform:  %s\n", cfg.Agent.Platform)
+	fmt.Printf("  Storage:   %s (%s)\n", cfg.Storage.Driver, cfg.Storage.DSN)
+	fmt.Printf("  WebUI:     %v (%s)\n", cfg.Web.Enabled, cfg.Web.ListenAddr)
+	fmt.Printf("  Telegram:  %v\n", cfg.Telegram.Enabled)
+	fmt.Printf("  DryRun:    %v\n", cfg.Response.DryRun)
+	if cfg.AI.Provider != "" {
+		fmt.Printf("  AI:        %s (%s)\n", cfg.AI.Provider, cfg.AI.Model)
+		fmt.Printf("  AutoAnalyze: %v\n", cfg.AI.AutoAnalyze)
+		if cfg.AI.APIKey == "" || cfg.AI.APIKey[0] == '$' {
+			fmt.Println("  ⚠ AI API key not resolved — set the environment variable")
+		}
+	} else {
+		fmt.Println("  AI:        disabled")
+	}
+}
+
+// cmdTestLLM verifies the configured LLM provider is reachable.
+func cmdTestLLM() {
+	cfg, err := config.Load("sentinel.yaml")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
+		os.Exit(1)
+	}
+
+	if cfg.AI.Provider == "" {
+		fmt.Fprintln(os.Stderr, "Error: ai.provider is not configured in sentinel.yaml")
+		os.Exit(1)
+	}
+
+	fmt.Printf("Testing LLM connection: %s (%s)...\n", cfg.AI.Provider, cfg.AI.Model)
+
+	logger := zerolog.Nop()
+
+	// Create a minimal agent just to test the connection.
+	mockMem := &nullMemory{}
+	mockStore := &nullStore{}
+
+	a, err := agent.NewAgent(cfg.AI, mockMem, mockStore, logger)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "✗ Failed to create agent: %v\n", err)
+		os.Exit(1)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := a.TestConnection(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "✗ LLM connection failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("✓ LLM connection successful: %s (%s)\n", cfg.AI.Provider, cfg.AI.Model)
+}
+
+// nullMemory is a no-op Memory implementation for test-llm.
+type nullMemory struct{}
+
+func (n *nullMemory) StoreLearning(fact, source string, confidence float64) error { return nil }
+func (n *nullMemory) GetRelevantContext(incidentID, sourceIP, ruleID string) (string, error) {
+	return "", nil
+}
+func (n *nullMemory) StoreContext(sessionID, ctx string) error    { return nil }
+func (n *nullMemory) GetContext(sessionID string) (string, error) { return "", nil }
+
+// nullStore is a no-op AnalysisStore for test-llm.
+type nullStore struct{}
+
+func (n *nullStore) SaveAnalysisLog(log *agent.AnalysisLog) error      { return nil }
+func (n *nullStore) SaveToolExecution(exec *agent.ToolExecution) error { return nil }

@@ -1,0 +1,22 @@
+{
+  "type": "ssh_brute_force_internal",
+  "description": "SSH failures from an internal Jenkins server — should NOT block",
+  "source": "auth.log",
+  "events": [
+    {"timestamp": "2026-02-10T11:00:01Z", "raw": "Feb 10 11:00:01 server sshd[5678]: Failed password for deploy from 10.0.0.5 port 60001 ssh2", "fields": {"source_ip": "10.0.0.5", "username": "deploy", "action": "failed_login", "service": "sshd"}},
+    {"timestamp": "2026-02-10T11:00:02Z", "raw": "Feb 10 11:00:02 server sshd[5678]: Failed password for deploy from 10.0.0.5 port 60002 ssh2", "fields": {"source_ip": "10.0.0.5", "username": "deploy", "action": "failed_login", "service": "sshd"}},
+    {"timestamp": "2026-02-10T11:00:03Z", "raw": "Feb 10 11:00:03 server sshd[5678]: Failed password for deploy from 10.0.0.5 port 60003 ssh2", "fields": {"source_ip": "10.0.0.5", "username": "deploy", "action": "failed_login", "service": "sshd"}},
+    {"timestamp": "2026-02-10T11:00:04Z", "raw": "Feb 10 11:00:04 server sshd[5678]: Failed password for deploy from 10.0.0.5 port 60004 ssh2", "fields": {"source_ip": "10.0.0.5", "username": "deploy", "action": "failed_login", "service": "sshd"}},
+    {"timestamp": "2026-02-10T11:00:05Z", "raw": "Feb 10 11:00:05 server sshd[5678]: Failed password for deploy from 10.0.0.5 port 60005 ssh2", "fields": {"source_ip": "10.0.0.5", "username": "deploy", "action": "failed_login", "service": "sshd"}}
+  ],
+  "expected": {
+    "rule_match": "ssh_brute_force",
+    "severity": "high",
+    "ai_analysis": {
+      "recommendation": "alert_admin",
+      "target": "10.0.0.5",
+      "note": "Agent should detect internal IP and NOT propose block_ip",
+      "requires_human": false
+    }
+  }
+}

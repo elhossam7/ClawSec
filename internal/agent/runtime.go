@@ -3,7 +3,9 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -89,6 +91,76 @@ func (a *Agent) RegisterTool(skill Skill) {
 	a.logger.Info().Str("tool", skill.Name()).Msg("registered agent tool")
 }
 
+// Health returns a summary of the agent's operational status.
+func (a *Agent) Health() map[string]interface{} {
+	status := "healthy"
+	if a.llm == nil {
+		status = "degraded"
+	}
+	return map[string]interface{}{
+		"status":       status,
+		"provider":     a.llm.Provider(),
+		"model":        a.cfg.Model,
+		"tools":        len(a.tools),
+		"auto_analyze": a.cfg.AutoAnalyze,
+	}
+}
+
+// ListTools returns the tool definitions available to the agent.
+func (a *Agent) ListTools() []ToolDef {
+	return a.getToolDefs()
+}
+
+// TestConnection verifies the LLM provider is reachable with a minimal call.
+func (a *Agent) TestConnection(ctx context.Context) error {
+	msgs := []Message{
+		{Role: "user", Content: "Respond with exactly: OK"},
+	}
+	resp, err := a.llm.Complete(ctx, msgs, nil)
+	if err != nil {
+		return fmt.Errorf("LLM connection test failed: %w", err)
+	}
+	if resp.Content == "" {
+		return fmt.Errorf("LLM returned empty response")
+	}
+	return nil
+}
+
+// callLLMWithRetry wraps LLM calls with exponential backoff retry logic.
+func (a *Agent) callLLMWithRetry(ctx context.Context, messages []Message, tools []ToolDef) (*LLMResponse, error) {
+	maxRetries := 3
+	var lastErr error
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			backoff := time.Duration(math.Pow(2, float64(attempt))) * time.Second
+			a.logger.Warn().
+				Int("attempt", attempt+1).
+				Dur("backoff", backoff).
+				Err(lastErr).
+				Msg("retrying LLM call")
+			select {
+			case <-time.After(backoff):
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+
+		resp, err := a.llm.Complete(ctx, messages, tools)
+		if err == nil {
+			return resp, nil
+		}
+		lastErr = err
+
+		// Don't retry on context cancellation or validation errors.
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return nil, err
+		}
+	}
+
+	return nil, fmt.Errorf("LLM API call failed after %d retries: %w", maxRetries, lastErr)
+}
+
 // AnalyzeIncident performs AI-driven analysis of a security incident.
 func (a *Agent) AnalyzeIncident(ctx context.Context, req types.AnalysisRequest) (*types.AnalysisResult, error) {
 	start := time.Now()
@@ -117,7 +189,7 @@ func (a *Agent) AnalyzeIncident(ctx context.Context, req types.AnalysisRequest) 
 	for iterations < maxIter {
 		iterations++
 
-		resp, err := a.llm.Complete(ctx, messages, a.getToolDefs())
+		resp, err := a.callLLMWithRetry(ctx, messages, a.getToolDefs())
 		if err != nil {
 			return nil, fmt.Errorf("LLM API call failed: %w", err)
 		}
@@ -214,7 +286,7 @@ func (a *Agent) Chat(ctx context.Context, query, sessionID string) (string, []ty
 	for iterations < maxIter {
 		iterations++
 
-		resp, err := a.llm.Complete(ctx, messages, a.getToolDefs())
+		resp, err := a.callLLMWithRetry(ctx, messages, a.getToolDefs())
 		if err != nil {
 			return "", nil, fmt.Errorf("LLM API call: %w", err)
 		}
@@ -294,7 +366,8 @@ func (a *Agent) executeTool(ctx context.Context, tc LLMTool) *types.ToolResult {
 	result, err := tool.Execute(ctx, params)
 	if err != nil {
 		a.logger.Error().Str("tool", tc.Name).Err(err).Msg("tool execution error")
-		return &types.ToolResult{Success: false, Error: err.Error()}
+		// Sanitise — don't leak internal paths or stack traces to LLM.
+		return &types.ToolResult{Success: false, Error: fmt.Sprintf("tool %s execution failed", tc.Name)}
 	}
 
 	a.logger.Info().Str("tool", tc.Name).Bool("success", result.Success).Msg("tool executed")

@@ -88,6 +88,8 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/rollback/", s.requireAuth(s.handleAPIRollback))
 	mux.HandleFunc("/api/rules/toggle/", s.requireAuth(s.handleAPIRuleToggle))
 	mux.HandleFunc("/api/health", s.handleAPIHealth)
+	mux.HandleFunc("/api/health/agent", s.handleAPIAgentHealth)
+	mux.HandleFunc("/api/tools", s.handleAPITools)
 
 	// AI Agent endpoints.
 	mux.HandleFunc("/api/chat", s.requireAuth(s.handleChat))
@@ -382,6 +384,27 @@ func (s *Server) handleAPIHealth(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(health)
+}
+
+func (s *Server) handleAPIAgentHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.agent == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "disabled",
+			"message": "AI agent not configured. Set ai.provider in sentinel.yaml.",
+		})
+		return
+	}
+	json.NewEncoder(w).Encode(s.agent.Health())
+}
+
+func (s *Server) handleAPITools(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.agent == nil {
+		json.NewEncoder(w).Encode([]interface{}{})
+		return
+	}
+	json.NewEncoder(w).Encode(s.agent.ListTools())
 }
 
 // --- SSE Handler ---

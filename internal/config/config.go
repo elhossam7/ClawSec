@@ -65,7 +65,7 @@ type FileSource struct {
 // DockerSource monitors Docker container logs.
 type DockerSource struct {
 	Enabled    bool     `yaml:"enabled"`
-	Socket     string   `yaml:"socket"` // e.g., /var/run/docker.sock
+	Socket     string   `yaml:"socket"`               // e.g., /var/run/docker.sock
 	Containers []string `yaml:"containers,omitempty"` // empty = all
 }
 
@@ -123,10 +123,10 @@ type LoggingConfig struct {
 
 // AIConfig configures the LLM-powered agent runtime.
 type AIConfig struct {
-	Provider  string  `yaml:"provider"`   // "anthropic", "openai", "ollama"
-	APIKey    string  `yaml:"api_key"`    // Or use env var: ${ANTHROPIC_API_KEY}
-	Model     string  `yaml:"model"`      // e.g. "claude-sonnet-4-20250514"
-	Endpoint  string  `yaml:"endpoint"`   // For ollama / custom endpoint
+	Provider string `yaml:"provider"` // "anthropic", "openai", "ollama"
+	APIKey   string `yaml:"api_key"`  // Or use env var: ${ANTHROPIC_API_KEY}
+	Model    string `yaml:"model"`    // e.g. "claude-sonnet-4-20250514"
+	Endpoint string `yaml:"endpoint"` // For ollama / custom endpoint
 
 	// Behaviour
 	AutoAnalyze  bool    `yaml:"auto_analyze"`   // Analyse all incidents automatically
@@ -220,13 +220,14 @@ func DefaultConfig() *Config {
 	}
 
 	// Platform-specific defaults
-	if platform == "linux" {
+	switch platform {
+	case "linux":
 		cfg.Sources.Journald = &JournaldSource{Enabled: true}
 		cfg.Sources.Syslog = &SyslogSource{Enabled: true, Path: "/var/log/syslog"}
 		cfg.Sources.Files = append(cfg.Sources.Files, FileSource{
 			Path: "/var/log/auth.log", Category: "auth", Parser: "auto",
 		})
-	} else if platform == "windows" {
+	case "windows":
 		cfg.Sources.EventLog = &EventLogSource{
 			Enabled:  true,
 			Channels: []string{"Security", "System", "Application"},
