@@ -20,15 +20,34 @@
     {{if .Pending}}
     <div class="card-body-flush">
         {{range .Pending}}
-        <div class="action-card" id="action-{{.ID}}">
+        <div class="action-card {{if .IncidentID}}action-card-ai{{end}}" id="action-{{.ID}}">
             <div class="action-card-inner">
                 <div class="action-card-body">
                     <div class="action-card-header">
                         {{severityBadge .Severity}}
                         <span class="action-type">{{.Type}}</span>
                         <span class="action-target">{{.Target}}</span>
+                        {{if .IncidentID}}
+                        <span class="ai-proposed-badge">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                            </svg>
+                            AI Proposed
+                        </span>
+                        {{end}}
                     </div>
                     <p class="action-reason">{{.Reason}}</p>
+                    {{if .IncidentID}}
+                    <div class="ai-analysis-bar">
+                        <span class="ai-analysis-label">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+                            </svg>
+                            Incident
+                        </span>
+                        <span class="code-inline">{{.IncidentID}}</span>
+                    </div>
+                    {{end}}
                     <div class="action-meta">
                         <span>Rule: <span class="code-inline">{{.RuleID}}</span></span>
                         <span>Created: {{timeAgo .CreatedAt}}</span>

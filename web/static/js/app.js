@@ -50,6 +50,8 @@
       '/approval': 'Approval Queue',
       '/rules': 'Detection Rules',
       '/audit': 'Audit Log',
+      '/chat': 'SOC Chat',
+      '/agent/tools': 'Agent Tools',
     };
     var topbarTitle = document.querySelector('.topbar-title');
     if (topbarTitle && titles[path]) {
@@ -258,6 +260,7 @@
       a: '/approval',
       r: '/rules',
       l: '/audit',
+      c: '/chat',
     };
 
     if (routes[e.key]) {
@@ -270,6 +273,140 @@
       updateActiveNav();
     }
   });
+
+  // ────────────────────────────────────────────
+  // AI Chat — Session & Messaging
+  // ────────────────────────────────────────────
+  var chatSessionId = 'session-' + Date.now();
+
+  window.sendChatMessage = function () {
+    var input = document.getElementById('chat-input');
+    if (!input) return;
+    var msg = input.value.trim();
+    if (!msg) return;
+
+    // Append user bubble
+    appendChatMsg('user', 'You', msg);
+    input.value = '';
+    autoResizeTextarea(input);
+
+    // Show typing indicator
+    showTypingIndicator();
+
+    // POST to /api/chat
+    fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, session_id: chatSessionId }),
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        removeTypingIndicator();
+        if (data.response) {
+          appendChatMsg('assistant', 'Sentinel AI', data.response);
+        }
+        if (data.tool_calls && data.tool_calls.length > 0) {
+          var toolSummary = data.tool_calls.map(function (tc) {
+            return '🔧 ' + tc.tool_name;
+          }).join('\n');
+          appendChatMsg('system', 'System', 'Tools invoked: ' + toolSummary);
+        }
+      })
+      .catch(function (err) {
+        removeTypingIndicator();
+        appendChatMsg('system', 'System', 'Error: ' + err.message);
+      });
+  };
+
+  window.clearChat = function () {
+    var container = document.getElementById('chat-messages');
+    if (container) container.innerHTML = '';
+    chatSessionId = 'session-' + Date.now();
+  };
+
+  window.sendSuggestion = function (btn) {
+    var input = document.getElementById('chat-input');
+    if (input && btn) {
+      input.value = btn.textContent.trim();
+      window.sendChatMessage();
+    }
+  };
+
+  window.handleChatKeydown = function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      window.sendChatMessage();
+    }
+  };
+
+  window.autoResizeTextarea = function (el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+  };
+
+  function appendChatMsg(role, name, text) {
+    var container = document.getElementById('chat-messages');
+    if (!container) return;
+
+    // Remove welcome screen if present
+    var welcome = container.querySelector('.chat-welcome');
+    if (welcome) welcome.remove();
+
+    var initials = name.split(' ').map(function (w) { return w[0]; }).join('').toUpperCase().slice(0, 2);
+
+    var msgDiv = document.createElement('div');
+    msgDiv.className = 'chat-msg ' + role;
+    msgDiv.innerHTML =
+      '<div class="chat-msg-avatar">' + initials + '</div>' +
+      '<div class="chat-msg-body">' +
+        '<span class="chat-msg-name">' + escapeHtml(name) + '</span>' +
+        '<div class="chat-msg-text">' + formatChatText(text) + '</div>' +
+      '</div>';
+
+    container.appendChild(msgDiv);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function showTypingIndicator() {
+    var container = document.getElementById('chat-messages');
+    if (!container) return;
+    var existing = container.querySelector('.chat-typing-indicator');
+    if (existing) return;
+
+    var div = document.createElement('div');
+    div.className = 'chat-msg assistant chat-typing-indicator';
+    div.innerHTML =
+      '<div class="chat-msg-avatar">SA</div>' +
+      '<div class="chat-msg-body">' +
+        '<span class="chat-msg-name">Sentinel AI</span>' +
+        '<div class="chat-msg-text">' +
+          '<div class="chat-typing"><span class="chat-typing-dot"></span><span class="chat-typing-dot"></span><span class="chat-typing-dot"></span></div>' +
+        '</div>' +
+      '</div>';
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function removeTypingIndicator() {
+    var indicator = document.querySelector('.chat-typing-indicator');
+    if (indicator) indicator.remove();
+  }
+
+  function formatChatText(text) {
+    // Basic markdown: code blocks, inline code, bold, newlines
+    text = escapeHtml(text);
+    text = text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+    text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+    text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/\n/g, '<br>');
+    return text;
+  }
+
+  function escapeHtml(text) {
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(text));
+    return div.innerHTML;
+  }
 
   // ────────────────────────────────────────────
   // Init on DOM Ready

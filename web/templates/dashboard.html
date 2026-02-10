@@ -102,42 +102,69 @@
         {{end}}
     </div>
 
-    <!-- System Overview -->
-    <div class="card">
-        <div class="card-header">
-            <div class="card-title">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-                    <line x1="8" y1="21" x2="16" y2="21"/>
-                    <line x1="12" y1="17" x2="12" y2="21"/>
-                </svg>
-                System Overview
-            </div>
-        </div>
-        <div class="card-body-flush">
-            <div class="info-list">
-                <div class="info-item">
-                    <span class="info-item-label">Uptime</span>
-                    <span class="info-item-value">{{.Uptime}}</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-item-label">Total Events</span>
-                    <span class="info-item-value">{{.EventCount}}</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-item-label">Active Rules</span>
-                    <span class="info-item-value" style="color: var(--color-success);">{{.ActiveRules}}</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-item-label">Open Incidents</span>
-                    <span class="info-item-value {{if .Incidents}}info-val-danger{{else}}info-val-success{{end}}">{{len .Incidents}}</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-item-label">Pending Actions</span>
-                    <span class="info-item-value {{if .PendingActions}}info-val-warning{{else}}info-val-success{{end}}">{{len .PendingActions}}</span>
+    <!-- System + Agent Overview stacked -->
+    <div class="dashboard-side-stack">
+
+        <!-- System Overview -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                        <line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                    </svg>
+                    System Overview
                 </div>
             </div>
+            <div class="card-body-flush">
+                <div class="info-list">
+                    <div class="info-item">
+                        <span class="info-item-label">Uptime</span>
+                        <span class="info-item-value">{{.Uptime}}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-item-label">Total Events</span>
+                        <span class="info-item-value">{{.EventCount}}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-item-label">Active Rules</span>
+                        <span class="info-item-value" style="color: var(--color-success);">{{.ActiveRules}}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-item-label">Open Incidents</span>
+                        <span class="info-item-value {{if .Incidents}}info-val-danger{{else}}info-val-success{{end}}">{{len .Incidents}}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-item-label">Pending Actions</span>
+                        <span class="info-item-value {{if .PendingActions}}info-val-warning{{else}}info-val-success{{end}}">{{len .PendingActions}}</span>
+                    </div>
+                </div>
+            </div>
         </div>
+
+        <!-- AI Agent Status -->
+        <div class="card ai-agent-card">
+            <div class="card-header">
+                <div class="card-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                    </svg>
+                    AI Agent
+                </div>
+                <a href="/chat" hx-get="/chat" hx-target="#main-content" hx-push-url="true" class="btn btn-ghost btn-sm">Open Chat</a>
+            </div>
+            <div class="card-body-flush" id="dash-agent-status"
+                 hx-get="/partials/agent-status" hx-trigger="load, every 30s"
+                 hx-target="#dash-agent-status" hx-swap="innerHTML">
+                <div class="info-list">
+                    <div class="info-item">
+                        <span class="info-item-label">Status</span>
+                        <span class="info-item-value" style="color: var(--text-muted);">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
 </div>

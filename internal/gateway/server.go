@@ -81,6 +81,11 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/rules", s.requireAuth(s.handleRules))
 	mux.HandleFunc("/incidents", s.requireAuth(s.handleIncidents))
 	mux.HandleFunc("/audit", s.requireAuth(s.handleAuditLog))
+	mux.HandleFunc("/chat", s.requireAuth(s.handleChatPage))
+	mux.HandleFunc("/agent/tools", s.requireAuth(s.handleAgentToolsPage))
+
+	// Partials (htmx fragments).
+	mux.HandleFunc("/partials/agent-status", s.requireAuth(s.handlePartialAgentStatus))
 
 	// API endpoints.
 	mux.HandleFunc("/api/approve/", s.requireAuth(s.handleAPIApprove))
@@ -244,6 +249,99 @@ func (s *Server) handleAuditLog(w http.ResponseWriter, r *http.Request) {
 		"Title":   "Audit Log",
 		"Content": data,
 	})
+}
+
+func (s *Server) handleChatPage(w http.ResponseWriter, r *http.Request) {
+	data := map[string]interface{}{
+		"Tools": s.getAgentToolsList(),
+	}
+
+	if r.Header.Get("HX-Request") == "true" {
+		s.templates.ExecuteTemplate(w, "chat-content", data)
+		return
+	}
+
+	s.templates.ExecuteTemplate(w, "layout", map[string]interface{}{
+		"Page":    "chat",
+		"Title":   "SOC Chat",
+		"Content": data,
+	})
+}
+
+func (s *Server) handleAgentToolsPage(w http.ResponseWriter, r *http.Request) {
+	tools := s.getAgentToolsList()
+	agentStatus := "offline"
+	provider := "none"
+	if s.agent != nil {
+		health := s.agent.Health()
+		agentStatus = health["status"].(string)
+		if p, ok := health["provider"]; ok {
+			provider = p.(string)
+		}
+	}
+
+	data := map[string]interface{}{
+		"Tools":    tools,
+		"Status":   agentStatus,
+		"Provider": provider,
+	}
+
+	if r.Header.Get("HX-Request") == "true" {
+		s.templates.ExecuteTemplate(w, "agent-tools-content", data)
+		return
+	}
+
+	s.templates.ExecuteTemplate(w, "layout", map[string]interface{}{
+		"Page":    "agent-tools",
+		"Title":   "Agent Tools",
+		"Content": data,
+	})
+}
+
+func (s *Server) handlePartialAgentStatus(w http.ResponseWriter, r *http.Request) {
+	status := "offline"
+	provider := "none"
+	toolCount := 0
+	if s.agent != nil {
+		health := s.agent.Health()
+		status = health["status"].(string)
+		if p, ok := health["provider"]; ok {
+			provider = p.(string)
+		}
+		toolCount = len(s.agent.ListTools())
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprintf(w, `<div class="info-list">
+		<div class="info-item">
+			<span class="info-item-label">Status</span>
+			<span class="info-item-value"><span class="status-dot-sm %s"></span>%s</span>
+		</div>
+		<div class="info-item">
+			<span class="info-item-label">Provider</span>
+			<span class="info-item-value"><span class="agent-provider-badge">%s</span></span>
+		</div>
+		<div class="info-item">
+			<span class="info-item-label">Skills</span>
+			<span class="info-item-value" style="color: var(--accent);">%d</span>
+		</div>
+	</div>`, status, status, provider, toolCount)
+}
+
+func (s *Server) getAgentToolsList() []map[string]interface{} {
+	if s.agent == nil {
+		return nil
+	}
+	tools := s.agent.ListTools()
+	result := make([]map[string]interface{}, 0, len(tools))
+	for _, t := range tools {
+		result = append(result, map[string]interface{}{
+			"Name":        t.Name,
+			"Description": t.Description,
+			"Parameters":  t.InputSchema,
+		})
+	}
+	return result
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
