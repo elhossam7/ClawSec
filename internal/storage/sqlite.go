@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 	"github.com/rs/zerolog"
 	"github.com/sentinel-agent/sentinel/internal/types"
 )
@@ -20,7 +20,7 @@ type SQLite struct {
 
 // NewSQLite opens or creates a SQLite database.
 func NewSQLite(dsn string, logger zerolog.Logger) (*SQLite, error) {
-	db, err := sql.Open("sqlite3", dsn+"?_journal_mode=WAL&_busy_timeout=5000")
+	db, err := sql.Open("sqlite", dsn+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)")
 	if err != nil {
 		return nil, fmt.Errorf("opening sqlite: %w", err)
 	}

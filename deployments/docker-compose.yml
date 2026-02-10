@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  sentinel:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+    container_name: sentinel
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - sentinel-data:/opt/sentinel/data
+      - ./sentinel.yaml:/opt/sentinel/sentinel.yaml:ro
+      # Mount host logs for monitoring (optional).
+      # - /var/log:/var/log:ro
+    environment:
+      - TZ=UTC
+    cap_add:
+      - NET_ADMIN
+    networks:
+      - sentinel-net
+
+volumes:
+  sentinel-data:
+
+networks:
+  sentinel-net:
+    driver: bridge
