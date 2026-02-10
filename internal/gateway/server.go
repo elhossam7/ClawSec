@@ -137,12 +137,12 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	eventCount, _ := s.store.EventCount()
 
 	data := map[string]interface{}{
-		"Events":        events,
-		"Incidents":     incidents,
+		"Events":         events,
+		"Incidents":      incidents,
 		"PendingActions": pending,
-		"EventCount":    eventCount,
-		"ActiveRules":   s.eng.RuleCount(),
-		"Uptime":        time.Since(s.startTime).Round(time.Second),
+		"EventCount":     eventCount,
+		"ActiveRules":    s.eng.RuleCount(),
+		"Uptime":         time.Since(s.startTime).Round(time.Second),
 	}
 
 	// If htmx partial request, render just the content.
@@ -421,34 +421,11 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 // --- Template helpers ---
 
 func severityBadge(s types.Severity) template.HTML {
-	colors := map[types.Severity]string{
-		types.SeverityInfo:     "bg-blue-100 text-blue-800",
-		types.SeverityLow:      "bg-green-100 text-green-800",
-		types.SeverityMedium:   "bg-yellow-100 text-yellow-800",
-		types.SeverityHigh:     "bg-orange-100 text-orange-800",
-		types.SeverityCritical: "bg-red-100 text-red-800",
-	}
-	class := colors[s]
-	return template.HTML(fmt.Sprintf(`<span class="px-2 py-1 text-xs font-medium rounded-full %s">%s</span>`, class, s.String()))
+	return template.HTML(fmt.Sprintf(`<span class="severity-badge severity-%s">%s</span>`, s.String(), s.String()))
 }
 
 func statusBadge(s string) template.HTML {
-	colors := map[string]string{
-		"open":           "bg-red-100 text-red-800",
-		"acknowledged":   "bg-yellow-100 text-yellow-800",
-		"resolved":       "bg-green-100 text-green-800",
-		"pending":        "bg-yellow-100 text-yellow-800",
-		"approved":       "bg-blue-100 text-blue-800",
-		"executed":       "bg-green-100 text-green-800",
-		"denied":         "bg-gray-100 text-gray-800",
-		"expired":        "bg-gray-100 text-gray-800",
-		"rolled_back":    "bg-purple-100 text-purple-800",
-	}
-	class := colors[s]
-	if class == "" {
-		class = "bg-gray-100 text-gray-800"
-	}
-	return template.HTML(fmt.Sprintf(`<span class="px-2 py-1 text-xs font-medium rounded-full %s">%s</span>`, class, s))
+	return template.HTML(fmt.Sprintf(`<span class="status-badge status-%s">%s</span>`, s, s))
 }
 
 func timeAgo(t time.Time) string {

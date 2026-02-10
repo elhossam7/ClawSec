@@ -1,50 +1,60 @@
 {{define "login"}}
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-gray-900">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sentinel - Login</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <title>Sentinel — Sign In</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Cpath d='M18 2L4 9v9c0 8.3 5.9 16 14 18 8.1-2 14-9.7 14-18V9L18 2z' fill='%2300d4ff'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="/static/css/style.css">
 </head>
-<body class="h-full">
-    <div class="min-h-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div class="max-w-md w-full space-y-8">
-            <div class="text-center">
-                <span class="text-6xl text-green-400">&#9737;</span>
-                <h2 class="mt-6 text-3xl font-extrabold text-white">Sentinel</h2>
-                <p class="mt-2 text-sm text-gray-400">Blue Team Defensive Agent</p>
+<body>
+    <div class="login-page">
+        <div class="login-card">
+            <div class="login-logo">
+                <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M28 4L8 14v12c0 13.2 8.5 25.5 20 28.8 11.5-3.3 20-15.6 20-28.8V14L28 4z"
+                          stroke="#00d4ff" stroke-width="1.5" fill="rgba(0,212,255,0.05)"/>
+                    <path d="M28 12l-12 6v8c0 8 5.4 15.4 12 17.4 6.6-2 12-9.4 12-17.4v-8l-12-6z"
+                          fill="rgba(0,212,255,0.08)"/>
+                    <circle cx="28" cy="26" r="4.5" fill="#00d4ff" opacity="0.85"/>
+                    <circle cx="28" cy="26" r="8" stroke="#00d4ff" stroke-width="0.7" opacity="0.2"/>
+                    <circle cx="28" cy="26" r="12" stroke="#00d4ff" stroke-width="0.4" opacity="0.1"/>
+                </svg>
+                <h1>Sentinel</h1>
+                <p>Blue Team Defensive Agent</p>
             </div>
 
-            {{if .Error}}
-            <div class="bg-red-900 border border-red-700 text-red-100 px-4 py-3 rounded">
+            {{if .}}{{if .Error}}
+            <div class="login-error">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
                 {{.Error}}
             </div>
-            {{end}}
+            {{end}}{{end}}
 
-            <form class="mt-8 space-y-6" action="/login" method="POST">
-                <div class="rounded-md shadow-sm -space-y-px">
-                    <div>
-                        <label for="username" class="sr-only">Username</label>
-                        <input id="username" name="username" type="text" required
-                               class="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-700 bg-gray-800 text-white placeholder-gray-500 rounded-t-md focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
-                               placeholder="Username">
-                    </div>
-                    <div>
-                        <label for="password" class="sr-only">Password</label>
-                        <input id="password" name="password" type="password" required
-                               class="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-700 bg-gray-800 text-white placeholder-gray-500 rounded-b-md focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
-                               placeholder="Password">
-                    </div>
+            <form action="/login" method="POST">
+                <div class="form-group">
+                    <label for="username" class="form-label">Username</label>
+                    <input id="username" name="username" type="text" required autocomplete="username"
+                           class="form-input" placeholder="admin">
                 </div>
-
-                <div>
-                    <button type="submit"
-                            class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                        Sign In
-                    </button>
+                <div class="form-group">
+                    <label for="password" class="form-label">Password</label>
+                    <input id="password" name="password" type="password" required autocomplete="current-password"
+                           class="form-input" placeholder="Enter password">
                 </div>
+                <button type="submit" class="login-btn">
+                    Sign In
+                </button>
             </form>
+
+            <p style="text-align:center; margin-top:24px; font-size:0.68rem; color:var(--text-muted);">
+                Secure access &middot; All sessions are logged
+            </p>
         </div>
     </div>
 </body>

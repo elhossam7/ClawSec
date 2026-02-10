@@ -1,72 +1,143 @@
 {{define "layout"}}
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-gray-50">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sentinel - {{.Title}}</title>
+    <title>Sentinel — {{.Title}}</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Cpath d='M18 2L4 9v9c0 8.3 5.9 16 14 18 8.1-2 14-9.7 14-18V9L18 2z' fill='%2300d4ff'/%3E%3C/svg%3E">
     <script src="https://unpkg.com/htmx.org@2.0.0"></script>
     <script src="https://unpkg.com/htmx-ext-sse@2.0.0/sse.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
-<body class="h-full" hx-ext="sse" sse-connect="/api/events/stream">
-    <div class="min-h-full">
-        <!-- Navigation -->
-        <nav class="bg-gray-900">
-            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                <div class="flex h-16 items-center justify-between">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <span class="text-2xl font-bold text-green-400">&#9737; Sentinel</span>
-                        </div>
-                        <div class="ml-10 flex items-baseline space-x-4">
-                            <a href="/" hx-get="/" hx-target="#main-content" hx-push-url="true"
-                               class="nav-link {{if eq .Page "dashboard"}}active{{end}} rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white">
-                                Dashboard
-                            </a>
-                            <a href="/approval" hx-get="/approval" hx-target="#main-content" hx-push-url="true"
-                               class="nav-link {{if eq .Page "approval"}}active{{end}} rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white">
-                                Approval Queue
-                                <span id="pending-badge" class="ml-1 inline-flex items-center rounded-full bg-red-600 px-2 py-0.5 text-xs font-medium text-white"
-                                      sse-swap="pending_count" hx-swap="innerHTML"></span>
-                            </a>
-                            <a href="/incidents" hx-get="/incidents" hx-target="#main-content" hx-push-url="true"
-                               class="nav-link {{if eq .Page "incidents"}}active{{end}} rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white">
-                                Incidents
-                            </a>
-                            <a href="/rules" hx-get="/rules" hx-target="#main-content" hx-push-url="true"
-                               class="nav-link {{if eq .Page "rules"}}active{{end}} rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white">
-                                Rules
-                            </a>
-                            <a href="/audit" hx-get="/audit" hx-target="#main-content" hx-push-url="true"
-                               class="nav-link {{if eq .Page "audit"}}active{{end}} rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white">
-                                Audit Log
-                            </a>
-                        </div>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <span class="text-xs text-gray-400">
-                            <span class="inline-block w-2 h-2 rounded-full bg-green-400 mr-1"></span>
-                            Agent Active
-                        </span>
+<body hx-ext="sse" sse-connect="/api/events/stream">
+    <div class="app-shell">
+
+        <!-- ═══ Sidebar ═══ -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <svg class="brand-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18 2L4 9v9c0 8.3 5.9 16 14 18 8.1-2 14-9.7 14-18V9L18 2z"
+                          stroke="#00d4ff" stroke-width="1.5" fill="rgba(0,212,255,0.06)"/>
+                    <path d="M18 8l-8 4v5c0 5 3.6 9.6 8 10.8 4.4-1.2 8-5.8 8-10.8v-5l-8-4z"
+                          fill="rgba(0,212,255,0.10)"/>
+                    <circle cx="18" cy="17" r="3" fill="#00d4ff"/>
+                    <circle cx="18" cy="17" r="5.5" stroke="#00d4ff" stroke-width="0.6" opacity="0.3"/>
+                </svg>
+                <div class="brand-text"><span>Sentinel</span></div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section-label">Monitor</div>
+
+                <a href="/" hx-get="/" hx-target="#main-content" hx-push-url="true"
+                   class="nav-item {{if eq .Page "dashboard"}}active{{end}}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="7" height="7" rx="1"/>
+                        <rect x="14" y="3" width="7" height="7" rx="1"/>
+                        <rect x="3" y="14" width="7" height="7" rx="1"/>
+                        <rect x="14" y="14" width="7" height="7" rx="1"/>
+                    </svg>
+                    Dashboard
+                </a>
+
+                <a href="/incidents" hx-get="/incidents" hx-target="#main-content" hx-push-url="true"
+                   class="nav-item {{if eq .Page "incidents"}}active{{end}}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    Incidents
+                </a>
+
+                <div class="nav-section-label">Respond</div>
+
+                <a href="/approval" hx-get="/approval" hx-target="#main-content" hx-push-url="true"
+                   class="nav-item {{if eq .Page "approval"}}active{{end}}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        <path d="M9 12l2 2 4-4"/>
+                    </svg>
+                    Approval Queue
+                    <span id="pending-badge" class="nav-badge" style="display:none"
+                          sse-swap="pending_count" hx-swap="innerHTML"></span>
+                </a>
+
+                <div class="nav-section-label">Configure</div>
+
+                <a href="/rules" hx-get="/rules" hx-target="#main-content" hx-push-url="true"
+                   class="nav-item {{if eq .Page "rules"}}active{{end}}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                        <line x1="10" y1="9" x2="8" y2="9"/>
+                    </svg>
+                    Rules
+                </a>
+
+                <a href="/audit" hx-get="/audit" hx-target="#main-content" hx-push-url="true"
+                   class="nav-item {{if eq .Page "audit"}}active{{end}}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 20h9"/>
+                        <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                    </svg>
+                    Audit Log
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="agent-status">
+                    <div class="status-dot"></div>
+                    <div>
+                        <div class="agent-status-text">Agent Active</div>
+                        <div class="agent-status-sub">Real-time monitoring</div>
                     </div>
                 </div>
             </div>
-        </nav>
+        </aside>
 
-        <!-- Main Content -->
-        <main>
-            <div class="mx-auto max-w-7xl py-6 sm:px-6 lg:px-8" id="main-content">
+        <!-- Mobile overlay -->
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+        <!-- ═══ Main ═══ -->
+        <div class="main-wrapper">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Toggle menu">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="3" y1="6" x2="21" y2="6"/>
+                            <line x1="3" y1="12" x2="21" y2="12"/>
+                            <line x1="3" y1="18" x2="21" y2="18"/>
+                        </svg>
+                    </button>
+                    <h1 class="topbar-title">{{.Title}}</h1>
+                </div>
+                <div class="topbar-right">
+                    <div class="topbar-stat">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                        </svg>
+                        Uptime <span class="stat-value" id="uptime-display">—</span>
+                    </div>
+                    <div class="topbar-stat">
+                        <div class="live-dot" style="width:5px;height:5px;"></div>
+                        <span style="color:var(--color-success);font-weight:600;">Online</span>
+                    </div>
+                </div>
+            </header>
+
+            <main class="content-area" id="main-content">
                 {{template "page-content" .}}
-            </div>
-        </main>
+            </main>
+        </div>
+
     </div>
 
-    <!-- Toast notifications via SSE -->
-    <div id="toast-container" class="fixed bottom-4 right-4 space-y-2 z-50"
-         sse-swap="notification" hx-swap="beforeend">
-    </div>
+    <!-- Toast Container -->
+    <div id="toast-container" sse-swap="notification" hx-swap="beforeend"></div>
 
     <script src="/static/js/app.js"></script>
 </body>

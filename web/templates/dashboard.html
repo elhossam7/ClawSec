@@ -1,127 +1,176 @@
 {{define "dashboard-content"}}
-<!-- Stats Cards -->
-<div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-    <div class="bg-white overflow-hidden shadow rounded-lg">
-        <div class="p-5">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <span class="text-2xl">&#128202;</span>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 truncate">Total Events</dt>
-                        <dd class="text-lg font-semibold text-gray-900">{{.EventCount}}</dd>
-                    </dl>
-                </div>
-            </div>
+<!-- ═══ Stat Cards ═══ -->
+<div class="stats-grid">
+    <div class="stat-card events">
+        <div class="stat-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
         </div>
+        <div class="stat-card-value" data-counter="{{.EventCount}}">{{.EventCount}}</div>
+        <div class="stat-card-label">Total Events</div>
     </div>
 
-    <div class="bg-white overflow-hidden shadow rounded-lg">
-        <div class="p-5">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <span class="text-2xl">&#9888;</span>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 truncate">Open Incidents</dt>
-                        <dd class="text-lg font-semibold text-red-600">{{len .Incidents}}</dd>
-                    </dl>
-                </div>
-            </div>
+    <div class="stat-card incidents">
+        <div class="stat-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
         </div>
+        <div class="stat-card-value" data-counter="{{len .Incidents}}">{{len .Incidents}}</div>
+        <div class="stat-card-label">Open Incidents</div>
     </div>
 
-    <div class="bg-white overflow-hidden shadow rounded-lg">
-        <div class="p-5">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <span class="text-2xl">&#9203;</span>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 truncate">Pending Actions</dt>
-                        <dd class="text-lg font-semibold text-yellow-600">{{len .PendingActions}}</dd>
-                    </dl>
-                </div>
-            </div>
+    <div class="stat-card pending">
+        <div class="stat-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+            </svg>
         </div>
+        <div class="stat-card-value" data-counter="{{len .PendingActions}}">{{len .PendingActions}}</div>
+        <div class="stat-card-label">Pending Actions</div>
     </div>
 
-    <div class="bg-white overflow-hidden shadow rounded-lg">
-        <div class="p-5">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <span class="text-2xl">&#128736;</span>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 truncate">Active Rules</dt>
-                        <dd class="text-lg font-semibold text-gray-900">{{.ActiveRules}}</dd>
-                    </dl>
-                </div>
-            </div>
+    <div class="stat-card rules">
+        <div class="stat-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
         </div>
+        <div class="stat-card-value" data-counter="{{.ActiveRules}}">{{.ActiveRules}}</div>
+        <div class="stat-card-label">Active Rules</div>
     </div>
 </div>
 
-<!-- Active Incidents -->
-{{if .Incidents}}
-<div class="bg-white shadow rounded-lg mb-8">
-    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-        <h3 class="text-lg font-medium leading-6 text-gray-900">Active Incidents</h3>
-    </div>
-    <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Severity</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source IP</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-                {{range .Incidents}}
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap">{{severityBadge .Severity}}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{.Title}}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{{.SourceIP}}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">{{statusBadge (printf "%s" .Status)}}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{timeAgo .CreatedAt}}</td>
-                </tr>
-                {{end}}
-            </tbody>
-        </table>
-    </div>
-</div>
-{{end}}
+<!-- ═══ Dashboard Grid: Incidents + System Info ═══ -->
+<div class="dashboard-grid section-mb">
 
-<!-- Recent Events (Live Stream) -->
-<div class="bg-white shadow rounded-lg">
-    <div class="px-4 py-5 sm:px-6 border-b border-gray-200 flex justify-between items-center">
-        <h3 class="text-lg font-medium leading-6 text-gray-900">Event Stream</h3>
-        <span class="inline-flex items-center text-xs text-green-600">
-            <span class="animate-pulse w-2 h-2 bg-green-400 rounded-full mr-1"></span>
-            Live
-        </span>
-    </div>
-    <div id="event-stream" class="max-h-96 overflow-y-auto" sse-swap="new_event" hx-swap="afterbegin">
-        {{range .Events}}
-        <div class="px-4 py-3 border-b border-gray-100 hover:bg-gray-50 text-sm">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-3">
-                    {{severityBadge .Severity}}
-                    <span class="text-gray-500 font-mono text-xs">{{.Source}}</span>
-                    <span class="text-gray-400 text-xs">{{.Category}}</span>
+    <!-- Active Incidents Table -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <div class="card-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    Active Incidents
                 </div>
-                <span class="text-gray-400 text-xs">{{timeAgo .Timestamp}}</span>
+                <div class="card-subtitle">Current open security incidents</div>
             </div>
-            <p class="mt-1 text-gray-700 font-mono text-xs truncate">{{.Raw}}</p>
+            <a href="/incidents" hx-get="/incidents" hx-target="#main-content" hx-push-url="true" class="btn btn-ghost btn-sm">View All</a>
+        </div>
+        {{if .Incidents}}
+        <div class="card-body-flush">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Severity</th>
+                        <th>Title</th>
+                        <th>Source IP</th>
+                        <th>Status</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Incidents}}
+                    <tr>
+                        <td>{{severityBadge .Severity}}</td>
+                        <td class="td-primary">{{.Title}}</td>
+                        <td><span class="mono-text">{{.SourceIP}}</span></td>
+                        <td>{{statusBadge (printf "%s" .Status)}}</td>
+                        <td class="td-muted"><span class="mono-text">{{timeAgo .CreatedAt}}</span></td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        {{else}}
+        <div class="empty-state">
+            <div class="empty-state-icon" style="background: rgba(16,185,129,0.06);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    <path d="M9 12l2 2 4-4"/>
+                </svg>
+            </div>
+            <div class="empty-state-title">All Clear</div>
+            <div class="empty-state-desc">No active incidents detected</div>
         </div>
         {{end}}
+    </div>
+
+    <!-- System Overview -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                    <line x1="8" y1="21" x2="16" y2="21"/>
+                    <line x1="12" y1="17" x2="12" y2="21"/>
+                </svg>
+                System Overview
+            </div>
+        </div>
+        <div class="card-body-flush">
+            <div class="info-list">
+                <div class="info-item">
+                    <span class="info-item-label">Uptime</span>
+                    <span class="info-item-value">{{.Uptime}}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-item-label">Total Events</span>
+                    <span class="info-item-value">{{.EventCount}}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-item-label">Active Rules</span>
+                    <span class="info-item-value" style="color: var(--color-success);">{{.ActiveRules}}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-item-label">Open Incidents</span>
+                    <span class="info-item-value {{if .Incidents}}info-val-danger{{else}}info-val-success{{end}}">{{len .Incidents}}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-item-label">Pending Actions</span>
+                    <span class="info-item-value {{if .PendingActions}}info-val-warning{{else}}info-val-success{{end}}">{{len .PendingActions}}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ═══ Live Event Stream ═══ -->
+<div class="card">
+    <div class="card-header">
+        <div>
+            <div class="card-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+                Event Stream
+            </div>
+            <div class="card-subtitle">Real-time security event feed</div>
+        </div>
+        <div class="live-indicator">
+            <span class="live-dot"></span>
+            Live
+        </div>
+    </div>
+    <div class="event-stream-wrap">
+        <div id="event-stream" class="event-stream" sse-swap="new_event" hx-swap="afterbegin">
+            {{range .Events}}
+            <div class="event-row">
+                <span class="event-time">{{timeAgo .Timestamp}}</span>
+                <span class="event-severity-dot {{.Severity}}"></span>
+                <span class="event-source">{{.Source}}</span>
+                <span class="event-category">{{.Category}}</span>
+                <span class="event-message">{{.Raw}}</span>
+            </div>
+            {{end}}
+        </div>
     </div>
 </div>
 {{end}}

@@ -1,42 +1,54 @@
 {{define "approval-content"}}
-<!-- Pending Actions -->
-<div class="bg-white shadow rounded-lg mb-8">
-    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-        <h3 class="text-lg font-medium leading-6 text-gray-900">
-            Pending Approval
-            <span class="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
-                {{len .Pending}}
-            </span>
-        </h3>
-        <p class="mt-1 text-sm text-gray-500">Review and approve or deny proposed response actions.</p>
+<!-- ═══ Pending Actions ═══ -->
+<div class="card section-mb">
+    <div class="card-header">
+        <div>
+            <div class="card-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    <path d="M9 12l2 2 4-4"/>
+                </svg>
+                Pending Approval
+                {{if .Pending}}
+                <span class="severity-badge severity-medium">{{len .Pending}}</span>
+                {{end}}
+            </div>
+            <div class="card-subtitle">Review and approve or deny proposed response actions</div>
+        </div>
     </div>
 
     {{if .Pending}}
-    <div class="divide-y divide-gray-200">
+    <div class="card-body-flush">
         {{range .Pending}}
-        <div class="p-6" id="action-{{.ID}}">
-            <div class="flex items-start justify-between">
-                <div class="flex-1">
-                    <div class="flex items-center space-x-3 mb-2">
+        <div class="action-card" id="action-{{.ID}}">
+            <div class="action-card-inner">
+                <div class="action-card-body">
+                    <div class="action-card-header">
                         {{severityBadge .Severity}}
-                        <span class="text-sm font-medium text-gray-900 uppercase">{{.Type}}</span>
-                        <span class="text-sm text-gray-500">Target: <code class="bg-gray-100 px-1 rounded">{{.Target}}</code></span>
+                        <span class="action-type">{{.Type}}</span>
+                        <span class="action-target">{{.Target}}</span>
                     </div>
-                    <p class="text-sm text-gray-600 mb-2">{{.Reason}}</p>
-                    <div class="text-xs text-gray-400 space-x-4">
-                        <span>Rule: {{.RuleID}}</span>
+                    <p class="action-reason">{{.Reason}}</p>
+                    <div class="action-meta">
+                        <span>Rule: <span class="code-inline">{{.RuleID}}</span></span>
                         <span>Created: {{timeAgo .CreatedAt}}</span>
                         <span>Expires: {{timeAgo .ExpiresAt}}</span>
                     </div>
                 </div>
-                <div class="flex space-x-2 ml-4">
+                <div class="action-buttons">
                     <button hx-post="/api/approve/{{.ID}}" hx-target="#main-content" hx-swap="innerHTML"
-                            class="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500">
-                        &#10003; Approve
+                            class="btn btn-success btn-sm">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        Approve
                     </button>
                     <button hx-post="/api/deny/{{.ID}}" hx-target="#main-content" hx-swap="innerHTML"
-                            class="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500">
-                        &#10007; Deny
+                            class="btn btn-danger btn-sm">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                        Deny
                     </button>
                 </div>
             </div>
@@ -44,45 +56,61 @@
         {{end}}
     </div>
     {{else}}
-    <div class="p-12 text-center text-gray-500">
-        <span class="text-4xl block mb-4">&#9989;</span>
-        <p class="text-lg font-medium">No pending actions</p>
-        <p class="text-sm">All clear! No response actions require approval.</p>
+    <div class="empty-state">
+        <div class="empty-state-icon" style="background: rgba(16,185,129,0.06);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <path d="M9 12l2 2 4-4"/>
+            </svg>
+        </div>
+        <div class="empty-state-title">No Pending Actions</div>
+        <div class="empty-state-desc">All clear — no response actions require approval</div>
     </div>
     {{end}}
 </div>
 
-<!-- Recent Actions History -->
-<div class="bg-white shadow rounded-lg">
-    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-        <h3 class="text-lg font-medium leading-6 text-gray-900">Recent Actions</h3>
+<!-- ═══ Recent Actions ═══ -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            Recent Actions
+        </div>
     </div>
+
     {{if .Recent}}
-    <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+    <div class="card-body-flush">
+        <table class="data-table">
+            <thead>
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Target</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Approved By</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    <th>Type</th>
+                    <th>Target</th>
+                    <th>Status</th>
+                    <th>Approved By</th>
+                    <th>Time</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
+            <tbody>
                 {{range .Recent}}
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{.Type}}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{{.Target}}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">{{statusBadge (printf "%s" .Status)}}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{.ApprovedBy}}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{timeAgo .CreatedAt}}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                <tr>
+                    <td class="td-primary" style="text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.03em;">{{.Type}}</td>
+                    <td><span class="code-inline">{{.Target}}</span></td>
+                    <td>{{statusBadge (printf "%s" .Status)}}</td>
+                    <td class="td-muted">{{.ApprovedBy}}</td>
+                    <td class="td-muted"><span class="mono-text">{{timeAgo .CreatedAt}}</span></td>
+                    <td>
                         {{if eq (printf "%s" .Status) "executed"}}
                         <button hx-post="/api/rollback/{{.ID}}" hx-target="#main-content" hx-swap="innerHTML"
                                 hx-confirm="Are you sure you want to rollback this action?"
-                                class="text-purple-600 hover:text-purple-900 font-medium">
+                                class="btn btn-ghost btn-sm" style="color: #c084fc; border-color: rgba(168,85,247,0.2);">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="1 4 1 10 7 10"/>
+                                <path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
+                            </svg>
                             Rollback
                         </button>
                         {{end}}
@@ -93,8 +121,16 @@
         </table>
     </div>
     {{else}}
-    <div class="p-8 text-center text-gray-500">
-        <p>No actions recorded yet.</p>
+    <div class="empty-state">
+        <div class="empty-state-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <line x1="3" y1="9" x2="21" y2="9"/>
+                <line x1="9" y1="21" x2="9" y2="9"/>
+            </svg>
+        </div>
+        <div class="empty-state-title">No Actions Yet</div>
+        <div class="empty-state-desc">Actions will appear here as they are processed</div>
     </div>
     {{end}}
 </div>
