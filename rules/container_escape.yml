@@ -1,0 +1,21 @@
+id: container_escape
+title: Container Escape Attempt
+description: Detects attempts to escape container isolation (Docker socket mounting, nsenter usage)
+severity: critical
+status: active
+author: Sentinel
+tags:
+  - attack.privilege_escalation
+  - attack.t1611
+
+logsource:
+  category: container
+
+detection:
+  selection:
+    "raw|re": "(?i)(mount.*docker\\.sock|nsenter.*-t\\s*1|capsh.*--print|/proc/sysrq-trigger|--privileged|hostPID.*true|hostNetwork.*true)"
+  condition: selection
+
+response:
+  - type: isolate_container
+    target_field: container_id

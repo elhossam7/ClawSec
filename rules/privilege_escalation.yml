@@ -1,0 +1,21 @@
+id: privilege_escalation
+title: Privilege Escalation Attempt
+description: Detects indicators of privilege escalation including sudo abuse and Windows special privilege assignment
+severity: critical
+status: active
+author: Sentinel
+tags:
+  - attack.privilege_escalation
+  - attack.t1548
+
+logsource:
+  category: auth
+
+detection:
+  selection:
+    "raw|re": "(?i)(sudo:.*COMMAND=|FAILED su for|event_id.*4672|event_id.*4673|pkexec|su root|setuid|chmod.*\\+s|chown.*root)"
+  condition: selection
+
+response:
+  - type: disable_user
+    target_field: username

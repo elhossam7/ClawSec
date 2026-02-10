@@ -1,0 +1,21 @@
+id: web_path_traversal
+title: Path Traversal Attack Detected
+description: Detects path traversal (directory traversal) attempts in web logs
+severity: high
+status: active
+author: Sentinel
+tags:
+  - attack.initial_access
+  - attack.t1190
+
+logsource:
+  category: web
+
+detection:
+  selection:
+    "raw|re": "(?i)(\\.\\./|\\.\\.\\\\|%2e%2e%2f|%2e%2e/|\\.\\.%2f|%252e%252e|/etc/passwd|/etc/shadow|/proc/self|c:\\\\windows)"
+  condition: selection
+
+response:
+  - type: block_ip
+    target_field: source_ip

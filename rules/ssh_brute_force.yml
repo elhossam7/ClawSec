@@ -1,0 +1,31 @@
+id: ssh_brute_force
+title: SSH Brute Force Detected
+description: Detects multiple failed SSH login attempts from the same source IP within a short time window
+severity: high
+status: active
+author: Sentinel
+tags:
+  - attack.credential_access
+  - attack.t1110
+
+logsource:
+  category: auth
+  product: linux
+  service: sshd
+
+detection:
+  selection:
+    "raw|contains":
+      - "Failed password"
+      - "authentication failure"
+  condition: selection
+
+correlation:
+  group_by:
+    - source_ip
+  threshold: 5
+  window: 5m
+
+response:
+  - type: block_ip
+    target_field: source_ip
