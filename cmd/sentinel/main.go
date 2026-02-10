@@ -157,6 +157,9 @@ func cmdRun() {
 	// Initialize platform manager.
 	platformMgr := platform.NewManager(cfg.Engine.BufferSize, logger)
 
+	// Register platform-specific log sources.
+	registerSources(cfg, platformMgr, logger)
+
 	// Register file watchers from config.
 	for _, f := range cfg.Sources.Files {
 		paths := []platform.WatchedPath{{
@@ -365,6 +368,23 @@ func cmdRules() {
 		}
 	default:
 		fmt.Printf("Unknown rules subcommand: %s\n", os.Args[2])
+	}
+}
+
+// registerSources registers platform-specific log sources based on config.
+func registerSources(cfg *config.Config, mgr *platform.Manager, logger zerolog.Logger) {
+	switch cfg.Agent.Platform {
+	case "windows":
+		if cfg.Sources.EventLog != nil && cfg.Sources.EventLog.Enabled {
+			src := platform.NewEventLogSource(cfg.Sources.EventLog.Channels, logger)
+			mgr.Register(src)
+			logger.Info().
+				Strs("channels", cfg.Sources.EventLog.Channels).
+				Msg("registered Windows Event Log source")
+		}
+	case "linux":
+		// Journald and syslog registration would go here for Linux builds.
+		logger.Info().Msg("Linux log sources registration (journald/syslog) requires Linux build")
 	}
 }
 

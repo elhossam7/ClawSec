@@ -126,8 +126,17 @@ func (fw *FileWatcher) Stop() error {
 }
 
 // readNewLines reads lines added since the last known offset.
+// Retries on transient file lock errors (common on Windows).
 func (fw *FileWatcher) readNewLines(wp *WatchedPath) ([]types.LogEvent, error) {
-	f, err := os.Open(wp.Path)
+	var f *os.File
+	var err error
+	for attempts := 0; attempts < 5; attempts++ {
+		f, err = os.Open(wp.Path)
+		if err == nil {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -167,6 +176,15 @@ func (fw *FileWatcher) readNewLines(wp *WatchedPath) ([]types.LogEvent, error) {
 	return events, scanner.Err()
 }
 
+// Common regex patterns for auto-extraction.
+var (
+	keyValueRe = regexp.MustCompile(`(\w+)=([^\s"]+|"[^"]*")`)
+	ipv4Re     = regexp.MustCompile(`\b((?:\d{1,3}\.){3}\d{1,3})\b`)
+	userRe     = regexp.MustCompile(`(?i)(?:user(?:name)?|acct)=([\w.-]+)`)
+	eventIDRe  = regexp.MustCompile(`(?i)(?:event_id|EventID|id)=(\d+)`)
+	containerRe = regexp.MustCompile(`(?i)(?:container_id|container)=([a-f0-9]{12,64})`)
+)
+
 // parseLine converts a raw log line into a LogEvent.
 func (fw *FileWatcher) parseLine(wp *WatchedPath, line string) types.LogEvent {
 	hostname, _ := os.Hostname()
@@ -179,7 +197,7 @@ func (fw *FileWatcher) parseLine(wp *WatchedPath, line string) types.LogEvent {
 		Hostname:  hostname,
 		Raw:       line,
 		Fields:    make(map[string]string),
-		Platform:  "file",
+		Platform:  detectPlatformFromLog(line),
 	}
 
 	// Attempt regex parsing if configured.
@@ -190,6 +208,67 @@ func (fw *FileWatcher) parseLine(wp *WatchedPath, line string) types.LogEvent {
 			for i, name := range names {
 				if i > 0 && name != "" && i < len(matches) {
 					ev.Fields[name] = matches[i]
+				}
+			}
+		}
+	}
+
+	// Auto-extract key=value pairs from log line.
+	for _, m := range keyValueRe.FindAllStringSubmatch(line, -1) {
+		key := strings.ToLower(m[1])
+		val := strings.Trim(m[2], `"`)
+		if _, exists := ev.Fields[key]; !exists {
+			ev.Fields[key] = val
+		}
+	}
+
+	// Auto-extract source_ip if not already set.
+	if _, ok := ev.Fields["source_ip"]; !ok {
+		if ips := ipv4Re.FindAllString(line, -1); len(ips) > 0 {
+			// Use the first non-local IP, or fall back to first IP.
+			for _, ip := range ips {
+				if !strings.HasPrefix(ip, "127.") {
+					ev.Fields["source_ip"] = ip
+					break
+				}
+			}
+			if _, ok := ev.Fields["source_ip"]; !ok {
+				ev.Fields["source_ip"] = ips[0]
+			}
+		}
+	}
+
+	// Auto-extract username if not already set.
+	if _, ok := ev.Fields["username"]; !ok {
+		if m := userRe.FindStringSubmatch(line); m != nil {
+			ev.Fields["username"] = m[1]
+		}
+	}
+
+	// Auto-extract event_id if not already set.
+	if _, ok := ev.Fields["event_id"]; !ok {
+		if m := eventIDRe.FindStringSubmatch(line); m != nil {
+			ev.Fields["event_id"] = m[1]
+		}
+	}
+
+	// Auto-extract container_id if not already set.
+	if _, ok := ev.Fields["container_id"]; !ok {
+		if m := containerRe.FindStringSubmatch(line); m != nil {
+			ev.Fields["container_id"] = m[1]
+		}
+	}
+
+	// Infer username from common log patterns.
+	if _, ok := ev.Fields["username"]; !ok {
+		lower := strings.ToLower(line)
+		if idx := strings.Index(lower, "for "); idx >= 0 {
+			rest := line[idx+4:]
+			parts := strings.Fields(rest)
+			if len(parts) > 0 {
+				u := strings.Trim(parts[0], ",:;")
+				if len(u) > 0 && len(u) < 32 {
+					ev.Fields["username"] = u
 				}
 			}
 		}
@@ -207,6 +286,24 @@ func (fw *FileWatcher) parseLine(wp *WatchedPath, line string) types.LogEvent {
 	}
 
 	return ev
+}
+
+// detectPlatformFromLog infers the platform from log content.
+func detectPlatformFromLog(line string) string {
+	lower := strings.ToLower(line)
+	switch {
+	case strings.Contains(lower, "sshd") || strings.Contains(lower, "sudo:") ||
+		strings.Contains(lower, "journald") || strings.Contains(lower, "systemd") ||
+		strings.Contains(lower, "pam_unix"):
+		return "linux"
+	case strings.Contains(lower, "event_id") || strings.Contains(lower, "eventid") ||
+		strings.Contains(lower, "microsoft-windows") || strings.Contains(lower, "winlogon"):
+		return "windows"
+	case strings.Contains(lower, "docker") || strings.Contains(lower, "container") ||
+		strings.Contains(lower, "k8s") || strings.Contains(lower, "kubelet"):
+		return "container"
+	}
+	return "file"
 }
 
 // findWatchedPath finds the WatchedPath matching a given filename.
