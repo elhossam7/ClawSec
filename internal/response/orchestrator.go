@@ -16,11 +16,12 @@ import (
 // Orchestrator manages the response action lifecycle:
 // pending → approved/denied → executed → (optional) rolled_back
 type Orchestrator struct {
-	cfg     config.ResponseConfig
-	exec    Executor
-	store   ActionStore
-	logger  zerolog.Logger
-	mu      sync.RWMutex
+	cfg    config.ResponseConfig
+	exec   Executor
+	store  ActionStore
+	policy *PolicyEngine
+	logger zerolog.Logger
+	mu     sync.RWMutex
 
 	// Callbacks for alerting
 	onAction  func(types.ResponseAction) // Called when action is queued
@@ -52,8 +53,14 @@ func NewOrchestrator(cfg config.ResponseConfig, exec Executor, store ActionStore
 		cfg:    cfg,
 		exec:   exec,
 		store:  store,
+		policy: NewPolicyEngine(),
 		logger: logger.With().Str("component", "response").Logger(),
 	}
+}
+
+// Policy returns the policy engine for external configuration.
+func (o *Orchestrator) Policy() *PolicyEngine {
+	return o.policy
 }
 
 // OnAction sets a callback for when a new action is queued.
@@ -273,6 +280,27 @@ func (o *Orchestrator) rollback(ctx context.Context, action *types.ResponseActio
 // GetPendingActions returns all pending response actions.
 func (o *Orchestrator) GetPendingActions() ([]types.ResponseAction, error) {
 	return o.store.GetPendingActions()
+}
+
+// SubmitProposal queues an AI-proposed action after policy validation.
+func (o *Orchestrator) SubmitProposal(proposal types.ActionProposal) error {
+	action := proposal.Action
+
+	// Run policy engine checks.
+	if err := o.policy.CheckRateLimit(string(action.Type)); err != nil {
+		o.logger.Warn().Str("type", string(action.Type)).Err(err).Msg("proposal rejected by policy")
+		return fmt.Errorf("policy violation: %w", err)
+	}
+
+	// Add AI metadata to the action reason.
+	action.Reason = fmt.Sprintf("[AI confidence=%.2f risk=%d] %s", proposal.Confidence, proposal.RiskScore, proposal.Reasoning)
+
+	return o.QueueAction(action)
+}
+
+// ValidateToolUse checks if a tool invocation is permitted by policy.
+func (o *Orchestrator) ValidateToolUse(toolName string, params map[string]interface{}) error {
+	return o.policy.ValidateAction(toolName, params)
 }
 
 // ExpireStaleActions marks expired pending actions.

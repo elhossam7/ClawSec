@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	_ "modernc.org/sqlite"
 	"github.com/rs/zerolog"
 	"github.com/sentinel-agent/sentinel/internal/types"
+	_ "modernc.org/sqlite"
 )
 
 // SQLite implements the storage layer using SQLite3.
@@ -44,6 +44,11 @@ func NewSQLite(dsn string, logger zerolog.Logger) (*SQLite, error) {
 // Close closes the database connection.
 func (s *SQLite) Close() error {
 	return s.db.Close()
+}
+
+// DB returns the underlying *sql.DB for packages that need direct access (e.g. agent memory, skills).
+func (s *SQLite) DB() *sql.DB {
+	return s.db
 }
 
 // migrate creates the database schema.
@@ -113,6 +118,50 @@ func (s *SQLite) migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents(status)`,
 		`CREATE INDEX IF NOT EXISTS idx_actions_status ON actions(status)`,
 		`CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp)`,
+
+		// --- AI Agent Tables ---
+		`CREATE TABLE IF NOT EXISTS agent_memory (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			fact TEXT NOT NULL,
+			source TEXT,
+			confidence REAL DEFAULT 0.5,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			last_accessed TIMESTAMP,
+			access_count INTEGER DEFAULT 0
+		)`,
+		`CREATE TABLE IF NOT EXISTS analysis_logs (
+			id TEXT PRIMARY KEY,
+			incident_id TEXT,
+			session_id TEXT,
+			prompt TEXT,
+			response TEXT,
+			reasoning TEXT,
+			confidence REAL,
+			tools_called TEXT,
+			outcome TEXT,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE TABLE IF NOT EXISTS tool_executions (
+			id TEXT PRIMARY KEY,
+			analysis_log_id TEXT,
+			tool_name TEXT,
+			parameters TEXT,
+			result TEXT,
+			success BOOLEAN,
+			error TEXT,
+			executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE TABLE IF NOT EXISTS chat_sessions (
+			session_id TEXT PRIMARY KEY,
+			user_id TEXT,
+			context TEXT,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_agent_memory_fact ON agent_memory(fact)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_logs_incident ON analysis_logs(incident_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_logs_session ON analysis_logs(session_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_tool_executions_tool ON tool_executions(tool_name)`,
 	}
 
 	for _, m := range migrations {
@@ -435,4 +484,89 @@ func scanActions(rows *sql.Rows) ([]types.ResponseAction, error) {
 		actions = append(actions, a)
 	}
 	return actions, rows.Err()
+}
+
+// ---------------------------------------------------------------------------
+// Agent Analysis Store (implements agent.AnalysisStore)
+// ---------------------------------------------------------------------------
+
+// AgentStore wraps SQLite to implement the agent.AnalysisStore interface.
+type AgentStore struct {
+	db *sql.DB
+}
+
+// NewAgentStore creates an agent store from the existing SQLite connection.
+func NewAgentStore(db *sql.DB) *AgentStore {
+	return &AgentStore{db: db}
+}
+
+// SaveAnalysisLog persists an LLM analysis record.
+func (s *AgentStore) SaveAnalysisLog(log *AnalysisLogRow) error {
+	_, err := s.db.Exec(
+		`INSERT INTO analysis_logs (id, incident_id, session_id, prompt, response, reasoning, confidence, tools_called, outcome, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		log.ID, log.IncidentID, log.SessionID, log.Prompt, log.Response,
+		log.Reasoning, log.Confidence, log.ToolsCalled, log.Outcome, log.CreatedAt,
+	)
+	return err
+}
+
+// SaveToolExecution persists a tool execution record.
+func (s *AgentStore) SaveToolExecution(exec *ToolExecutionRow) error {
+	_, err := s.db.Exec(
+		`INSERT INTO tool_executions (id, analysis_log_id, tool_name, parameters, result, success, error, executed_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		exec.ID, exec.AnalysisLogID, exec.ToolName, exec.Parameters,
+		exec.Result, exec.Success, exec.Error, exec.ExecutedAt,
+	)
+	return err
+}
+
+// GetRecentAnalyses returns recent analysis logs.
+func (s *AgentStore) GetRecentAnalyses(limit int) ([]AnalysisLogRow, error) {
+	rows, err := s.db.Query(
+		`SELECT id, incident_id, session_id, reasoning, confidence, tools_called, outcome, created_at
+		 FROM analysis_logs ORDER BY created_at DESC LIMIT ?`, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []AnalysisLogRow
+	for rows.Next() {
+		var r AnalysisLogRow
+		if err := rows.Scan(&r.ID, &r.IncidentID, &r.SessionID, &r.Reasoning,
+			&r.Confidence, &r.ToolsCalled, &r.Outcome, &r.CreatedAt); err != nil {
+			continue
+		}
+		results = append(results, r)
+	}
+	return results, nil
+}
+
+// AnalysisLogRow is the DB representation of an analysis log entry.
+type AnalysisLogRow struct {
+	ID          string
+	IncidentID  string
+	SessionID   string
+	Prompt      string
+	Response    string
+	Reasoning   string
+	Confidence  float64
+	ToolsCalled string
+	Outcome     string
+	CreatedAt   time.Time
+}
+
+// ToolExecutionRow is the DB representation of a tool execution entry.
+type ToolExecutionRow struct {
+	ID            string
+	AnalysisLogID string
+	ToolName      string
+	Parameters    string
+	Result        string
+	Success       bool
+	Error         string
+	ExecutedAt    time.Time
 }

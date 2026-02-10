@@ -152,3 +152,77 @@ type SystemHealth struct {
 	Platform     string        `json:"platform"`
 	Version      string        `json:"version"`
 }
+
+// ---------------------------------------------------------------------------
+// AI Agent Types
+// ---------------------------------------------------------------------------
+
+// ToolDefinition describes a skill/tool for the LLM.
+type ToolDefinition struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Parameters  map[string]interface{} `json:"parameters"` // JSON Schema
+}
+
+// AnalysisRequest is sent from the detection engine to the agent runtime.
+type AnalysisRequest struct {
+	Incident     Incident               `json:"incident"`
+	MatchedRules []string               `json:"matched_rules"` // Rule IDs
+	Context      map[string]interface{} `json:"context,omitempty"`
+	Timestamp    time.Time              `json:"timestamp"`
+}
+
+// AnalysisResult is the agent's structured output after analysing an incident.
+type AnalysisResult struct {
+	IncidentID      string           `json:"incident_id"`
+	Summary         string           `json:"summary"`
+	Reasoning       string           `json:"reasoning"`
+	Confidence      float64          `json:"confidence"`
+	RiskScore       int              `json:"risk_score"` // 1-10
+	ProposedActions []ActionProposal `json:"proposed_actions"`
+	ToolCalls       []ToolCall       `json:"tool_calls"`
+	RequiresHuman   bool             `json:"requires_human"`
+	CreatedAt       time.Time        `json:"created_at"`
+}
+
+// ActionProposal is an AI-suggested action with reasoning metadata.
+type ActionProposal struct {
+	Action       ResponseAction   `json:"action"`
+	Reasoning    string           `json:"reasoning"`
+	Confidence   float64          `json:"confidence"`
+	RiskScore    int              `json:"risk_score"`
+	Alternatives []ResponseAction `json:"alternatives,omitempty"`
+}
+
+// ToolCall records a single tool invocation by the agent.
+type ToolCall struct {
+	ToolName   string                 `json:"tool_name"`
+	Parameters map[string]interface{} `json:"parameters"`
+	Result     *ToolResult            `json:"result,omitempty"`
+	Timestamp  time.Time              `json:"timestamp"`
+}
+
+// ToolResult is the output of a skill execution.
+type ToolResult struct {
+	Success bool                   `json:"success"`
+	Output  string                 `json:"output"`
+	Data    map[string]interface{} `json:"data,omitempty"`
+	Error   string                 `json:"error,omitempty"`
+}
+
+// Identity carries rich auth context through the approval workflow.
+type Identity struct {
+	UserID      string   `json:"user_id"`
+	Username    string   `json:"username"`
+	Roles       []string `json:"roles"`
+	Permissions []string `json:"permissions"`
+	IPAddress   string   `json:"ip_address"`
+}
+
+// ChatMessage represents a single turn in an agent conversation.
+type ChatMessage struct {
+	Role      string    `json:"role"` // "user", "assistant", "system", "tool"
+	Content   string    `json:"content"`
+	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
+}

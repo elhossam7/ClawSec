@@ -12,12 +12,14 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/sentinel-agent/sentinel/internal/agent"
 	"github.com/sentinel-agent/sentinel/internal/alerting"
 	"github.com/sentinel-agent/sentinel/internal/config"
 	"github.com/sentinel-agent/sentinel/internal/engine"
 	"github.com/sentinel-agent/sentinel/internal/gateway"
 	"github.com/sentinel-agent/sentinel/internal/platform"
 	"github.com/sentinel-agent/sentinel/internal/response"
+	"github.com/sentinel-agent/sentinel/internal/skills"
 	"github.com/sentinel-agent/sentinel/internal/storage"
 	"github.com/sentinel-agent/sentinel/internal/types"
 )
@@ -192,6 +194,84 @@ func cmdRun() {
 	executor := response.NewPlatformExecutor(logger)
 	orchestrator := response.NewOrchestrator(cfg.Response, executor, store, logger)
 
+	// ---------------------------------------------------------------------------
+	// AI Agent Initialization (optional — only when ai.provider is configured)
+	// ---------------------------------------------------------------------------
+	var aiAgent *agent.Agent
+	if cfg.AI.Provider != "" {
+		logger.Info().
+			Str("provider", cfg.AI.Provider).
+			Str("model", cfg.AI.Model).
+			Bool("auto_analyze", cfg.AI.AutoAnalyze).
+			Msg("initializing AI agent")
+
+		// Create agent memory backed by SQLite.
+		memory, err := agent.NewSQLiteMemory(store.DB())
+		if err != nil {
+			logger.Error().Err(err).Msg("failed to create agent memory")
+		} else {
+			// Create agent analysis store.
+			agentStore := storage.NewAgentStoreAdapter(storage.NewAgentStore(store.DB()))
+
+			aiAgent, err = agent.NewAgent(cfg.AI, memory, agentStore, logger)
+			if err != nil {
+				logger.Error().Err(err).Msg("failed to create AI agent")
+			} else {
+				// Register skills/tools.
+				protectedCIDRs := orchestrator.Policy().GetAllowList("block_ip")
+
+				aiAgent.RegisterTool(skills.NewFirewallSkill(protectedCIDRs, logger))
+				aiAgent.RegisterTool(skills.NewProcessSkill(nil, logger))
+				aiAgent.RegisterTool(skills.NewProcessInfoSkill(logger))
+				aiAgent.RegisterTool(skills.NewGetLogsSkill(store.DB(), logger))
+				aiAgent.RegisterTool(skills.NewSearchIncidentsSkill(store.DB(), logger))
+				aiAgent.RegisterTool(skills.NewCheckInternalSkill(protectedCIDRs, logger))
+				aiAgent.RegisterTool(skills.NewAssetQuerySkill(store.DB(), logger))
+				aiAgent.RegisterTool(skills.NewIPReputationSkill(cfg.Skills.ThreatIntel.AbuseIPDBKey, logger))
+				aiAgent.RegisterTool(skills.NewHashReputationSkill(cfg.Skills.ThreatIntel.VirusTotalKey, logger))
+
+				logger.Info().Msg("AI agent initialized with 9 skills")
+
+				// Enable AI analysis routing in the detection engine.
+				if cfg.AI.AutoAnalyze {
+					eng.EnableAI()
+
+					// Start analysis worker goroutine.
+					go func() {
+						for {
+							select {
+							case req := <-eng.AnalysisQueue():
+								result, err := aiAgent.AnalyzeIncident(ctx, req)
+								if err != nil {
+									logger.Error().Err(err).Str("incident", req.Incident.ID).Msg("AI analysis failed")
+									continue
+								}
+								// Submit proposals to orchestrator.
+								for _, proposal := range result.ProposedActions {
+									if err := orchestrator.SubmitProposal(proposal); err != nil {
+										logger.Error().Err(err).Msg("failed to submit AI proposal")
+									}
+								}
+								// Broadcast analysis result via SSE.
+								if webServer != nil {
+									webServer.BroadcastAgentEvent("ai_analysis", map[string]interface{}{
+										"incident_id":  result.IncidentID,
+										"summary":      result.Summary,
+										"confidence":   result.Confidence,
+										"risk_score":   result.RiskScore,
+										"human_needed": result.RequiresHuman,
+									})
+								}
+							case <-ctx.Done():
+								return
+							}
+						}
+					}()
+				}
+			}
+		}
+	}
+
 	// Wire up: engine incidents → create incidents in store + queue actions.
 	go func() {
 		for incident := range eng.Incidents() {
@@ -258,6 +338,11 @@ func cmdRun() {
 	if cfg.Web.Enabled {
 		webServer = gateway.NewServer(cfg.Web, store, eng, orchestrator, logger)
 
+		// Wire AI agent into gateway for chat API.
+		if aiAgent != nil {
+			webServer.SetAgent(aiAgent)
+		}
+
 		// Wire alerts to WebUI SSE.
 		orchestrator.OnAction(func(a types.ResponseAction) {
 			webServer.BroadcastEvent("notification",
@@ -286,6 +371,8 @@ func cmdRun() {
 		Bool("webui", cfg.Web.Enabled).
 		Bool("telegram", cfg.Telegram.Enabled).
 		Bool("dry_run", cfg.Response.DryRun).
+		Bool("ai_enabled", aiAgent != nil).
+		Str("ai_provider", cfg.AI.Provider).
 		Msg("Sentinel is running")
 
 	if cfg.Web.Enabled {

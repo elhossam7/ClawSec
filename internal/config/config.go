@@ -21,6 +21,8 @@ type Config struct {
 	Telegram TelegramConfig `yaml:"telegram"`
 	Storage  StorageConfig  `yaml:"storage"`
 	Logging  LoggingConfig  `yaml:"logging"`
+	AI       AIConfig       `yaml:"ai"`
+	Skills   SkillsConfig   `yaml:"skills"`
 }
 
 // AgentConfig configures the core agent behavior.
@@ -119,6 +121,51 @@ type LoggingConfig struct {
 	Output string `yaml:"output"` // stdout, file path
 }
 
+// AIConfig configures the LLM-powered agent runtime.
+type AIConfig struct {
+	Provider  string  `yaml:"provider"`   // "anthropic", "openai", "ollama"
+	APIKey    string  `yaml:"api_key"`    // Or use env var: ${ANTHROPIC_API_KEY}
+	Model     string  `yaml:"model"`      // e.g. "claude-sonnet-4-20250514"
+	Endpoint  string  `yaml:"endpoint"`   // For ollama / custom endpoint
+
+	// Behaviour
+	AutoAnalyze  bool    `yaml:"auto_analyze"`   // Analyse all incidents automatically
+	MaxToolCalls int     `yaml:"max_tool_calls"` // Prevent infinite loops
+	Temperature  float64 `yaml:"temperature"`    // LLM creativity (0.0-1.0)
+
+	// Safety
+	RequireApprovalAboveRisk int     `yaml:"require_approval_above_risk"` // 1-10
+	ConfidenceThreshold      float64 `yaml:"confidence_threshold"`        // Min confidence for auto-execution
+}
+
+// SkillsConfig holds API keys used by investigation skills.
+type SkillsConfig struct {
+	ThreatIntel ThreatIntelConfig `yaml:"threat_intel"`
+}
+
+// ThreatIntelConfig holds external threat-intel API keys.
+type ThreatIntelConfig struct {
+	AbuseIPDBKey  string `yaml:"abuseipdb_key"`
+	VirusTotalKey string `yaml:"virustotal_key"`
+}
+
+// RateLimitConfig configures per-action rate limits.
+type RateLimitConfig struct {
+	Max    int           `yaml:"max"`
+	Window time.Duration `yaml:"window"`
+}
+
+// ResolveEnv replaces ${VAR} references in config strings with their env values.
+func ResolveEnv(s string) string {
+	if len(s) > 3 && s[0] == '$' && s[1] == '{' && s[len(s)-1] == '}' {
+		envKey := s[2 : len(s)-1]
+		if v := os.Getenv(envKey); v != "" {
+			return v
+		}
+	}
+	return s
+}
+
 // DefaultConfig returns a sensible default configuration.
 func DefaultConfig() *Config {
 	hostname, _ := os.Hostname()
@@ -161,6 +208,14 @@ func DefaultConfig() *Config {
 			Level:  "info",
 			Format: "console",
 			Output: "stdout",
+		},
+		AI: AIConfig{
+			Provider:                 "",
+			AutoAnalyze:              false,
+			MaxToolCalls:             10,
+			Temperature:              0.3,
+			RequireApprovalAboveRisk: 7,
+			ConfidenceThreshold:      0.85,
 		},
 	}
 
@@ -246,5 +301,36 @@ func (c *Config) Validate() error {
 	if c.Engine.BufferSize < 100 {
 		c.Engine.BufferSize = 100
 	}
+
+	// Resolve env vars for AI config.
+	if c.AI.APIKey != "" {
+		c.AI.APIKey = ResolveEnv(c.AI.APIKey)
+	}
+	if c.Skills.ThreatIntel.AbuseIPDBKey != "" {
+		c.Skills.ThreatIntel.AbuseIPDBKey = ResolveEnv(c.Skills.ThreatIntel.AbuseIPDBKey)
+	}
+	if c.Skills.ThreatIntel.VirusTotalKey != "" {
+		c.Skills.ThreatIntel.VirusTotalKey = ResolveEnv(c.Skills.ThreatIntel.VirusTotalKey)
+	}
+
+	// Validate AI config when a provider is set.
+	if c.AI.Provider != "" {
+		switch c.AI.Provider {
+		case "anthropic", "openai", "ollama":
+			// ok
+		default:
+			return fmt.Errorf("ai.provider must be 'anthropic', 'openai', or 'ollama', got %q", c.AI.Provider)
+		}
+		if c.AI.Provider != "ollama" && c.AI.APIKey == "" {
+			return fmt.Errorf("ai.api_key is required for provider %q", c.AI.Provider)
+		}
+		if c.AI.Model == "" {
+			return fmt.Errorf("ai.model is required when ai.provider is set")
+		}
+		if c.AI.MaxToolCalls < 1 {
+			c.AI.MaxToolCalls = 10
+		}
+	}
+
 	return nil
 }

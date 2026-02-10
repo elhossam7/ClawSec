@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/sentinel-agent/sentinel/internal/types"
@@ -20,9 +21,13 @@ type Engine struct {
 	mu         sync.RWMutex
 
 	// Channels
-	events    <-chan types.LogEvent
-	incidents chan Incident
-	actions   chan types.ResponseAction
+	events        <-chan types.LogEvent
+	incidents     chan Incident
+	actions       chan types.ResponseAction
+	analysisQueue chan types.AnalysisRequest // AI agent analysis queue
+
+	// AI agent integration
+	aiEnabled bool
 }
 
 // Incident is an engine-level detection result.
@@ -37,14 +42,26 @@ type Incident struct {
 // New creates a new detection engine.
 func New(workers int, events <-chan types.LogEvent, logger zerolog.Logger) *Engine {
 	return &Engine{
-		rules:      make(map[string]*CompiledRule),
-		correlator: NewCorrelator(logger),
-		workers:    workers,
-		events:     events,
-		incidents:  make(chan Incident, 1000),
-		actions:    make(chan types.ResponseAction, 100),
-		logger:     logger.With().Str("component", "engine").Logger(),
+		rules:         make(map[string]*CompiledRule),
+		correlator:    NewCorrelator(logger),
+		workers:       workers,
+		events:        events,
+		incidents:     make(chan Incident, 1000),
+		actions:       make(chan types.ResponseAction, 100),
+		analysisQueue: make(chan types.AnalysisRequest, 100),
+		logger:        logger.With().Str("component", "engine").Logger(),
 	}
+}
+
+// EnableAI turns on AI-powered analysis routing.
+func (e *Engine) EnableAI() {
+	e.aiEnabled = true
+	e.logger.Info().Msg("AI-powered analysis enabled — incidents will be routed to agent")
+}
+
+// AnalysisQueue returns the channel where AI analysis requests are sent.
+func (e *Engine) AnalysisQueue() <-chan types.AnalysisRequest {
+	return e.analysisQueue
 }
 
 // LoadRules loads and compiles all rules from the given directory.
@@ -170,10 +187,35 @@ func (e *Engine) processEvent(ctx context.Context, event types.LogEvent) {
 				Evidence: []string{event.ID},
 			}
 
-			select {
-			case e.actions <- ra:
-			case <-ctx.Done():
-				return
+			// When AI is enabled, route to agent analysis instead of direct action.
+			if e.aiEnabled {
+				analysisReq := types.AnalysisRequest{
+					Incident: types.Incident{
+						ID:          fmt.Sprintf("inc_%d", time.Now().UnixNano()),
+						Title:       incident.Message,
+						Description: rule.Description,
+						Severity:    rule.Severity,
+						Status:      types.IncidentOpen,
+						RuleID:      rule.ID,
+						SourceIP:    event.Fields["source_ip"],
+						TargetUser:  event.Fields["username"],
+						CreatedAt:   time.Now(),
+						UpdatedAt:   time.Now(),
+					},
+					MatchedRules: []string{rule.ID},
+					Timestamp:    time.Now(),
+				}
+				select {
+				case e.analysisQueue <- analysisReq:
+				case <-ctx.Done():
+					return
+				}
+			} else {
+				select {
+				case e.actions <- ra:
+				case <-ctx.Done():
+					return
+				}
 			}
 		}
 	}

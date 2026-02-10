@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/sentinel-agent/sentinel/internal/agent"
 	"github.com/sentinel-agent/sentinel/internal/config"
 	"github.com/sentinel-agent/sentinel/internal/engine"
 	"github.com/sentinel-agent/sentinel/internal/response"
@@ -26,6 +27,7 @@ type Server struct {
 	store        *storage.SQLite
 	eng          *engine.Engine
 	orchestrator *response.Orchestrator
+	agent        *agent.Agent
 	templates    *template.Template
 	sseClients   map[chan string]bool
 	sseMu        sync.Mutex
@@ -45,6 +47,11 @@ func NewServer(cfg config.WebConfig, store *storage.SQLite, eng *engine.Engine, 
 		logger:       logger.With().Str("component", "gateway").Logger(),
 		startTime:    time.Now(),
 	}
+}
+
+// SetAgent wires the AI agent into the gateway for chat and analysis APIs.
+func (s *Server) SetAgent(a *agent.Agent) {
+	s.agent = a
 }
 
 // Start begins serving HTTP requests.
@@ -81,6 +88,10 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/rollback/", s.requireAuth(s.handleAPIRollback))
 	mux.HandleFunc("/api/rules/toggle/", s.requireAuth(s.handleAPIRuleToggle))
 	mux.HandleFunc("/api/health", s.handleAPIHealth)
+
+	// AI Agent endpoints.
+	mux.HandleFunc("/api/chat", s.requireAuth(s.handleChat))
+	mux.HandleFunc("/v1/stream", s.requireAuth(s.handleAgentStream))
 
 	// Server-Sent Events for real-time updates.
 	mux.HandleFunc("/api/events/stream", s.requireAuth(s.handleSSE))
@@ -249,10 +260,12 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 				Secure:   s.cfg.TLSCert != "",
 				MaxAge:   3600 * 8,
 			})
+			s.audit("login_success", fmt.Sprintf("webui:%s", username), fmt.Sprintf("Successful login from %s", r.RemoteAddr))
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
 
+		s.audit("login_failed", fmt.Sprintf("webui:%s", username), fmt.Sprintf("Failed login attempt from %s", r.RemoteAddr))
 		s.templates.ExecuteTemplate(w, "login", map[string]interface{}{
 			"Error": "Invalid credentials",
 		})
@@ -260,6 +273,21 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.templates.ExecuteTemplate(w, "login", nil)
+}
+
+// --- Audit Helpers ---
+
+func (s *Server) audit(action, actor, details string) {
+	entry := &types.AuditEntry{
+		ID:        fmt.Sprintf("aud_%d", time.Now().UnixNano()),
+		Action:    action,
+		Actor:     actor,
+		Details:   details,
+		Timestamp: time.Now(),
+	}
+	if err := s.store.SaveAuditEntry(entry); err != nil {
+		s.logger.Error().Err(err).Str("action", action).Msg("failed to save audit entry")
+	}
 }
 
 // --- API Handlers ---
@@ -276,6 +304,7 @@ func (s *Server) handleAPIApprove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.audit("action_approved", "webui:admin", fmt.Sprintf("Approved and executed action %s", actionID))
 	s.BroadcastEvent("action_executed", actionID)
 
 	// Return updated approval queue for htmx swap.
@@ -294,6 +323,7 @@ func (s *Server) handleAPIDeny(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.audit("action_denied", "webui:admin", fmt.Sprintf("Denied action %s", actionID))
 	s.handleApprovalQueue(w, r)
 }
 
@@ -309,6 +339,7 @@ func (s *Server) handleAPIRollback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.audit("action_rolledback", "webui:admin", fmt.Sprintf("Rolled back action %s", actionID))
 	s.BroadcastEvent("action_rolledback", actionID)
 	s.handleApprovalQueue(w, r)
 }
@@ -334,6 +365,7 @@ func (s *Server) handleAPIRuleToggle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.audit("rule_"+action+"d", "webui:admin", fmt.Sprintf("Rule %s %sd", ruleID, action))
 	s.handleRules(w, r)
 }
 
@@ -445,4 +477,110 @@ func timeAgo(t time.Time) string {
 func jsonMarshal(v interface{}) template.JS {
 	b, _ := json.Marshal(v)
 	return template.JS(b)
+}
+
+// ---------------------------------------------------------------------------
+// AI Agent Handlers
+// ---------------------------------------------------------------------------
+
+// ChatRequest is the JSON body for POST /api/chat.
+type ChatRequest struct {
+	Message   string            `json:"message"`
+	SessionID string            `json:"session_id"`
+	Context   map[string]string `json:"context,omitempty"`
+}
+
+// ChatResponse is the JSON response from the chat endpoint.
+type ChatResponse struct {
+	Response   string   `json:"response"`
+	ToolsUsed  []string `json:"tools_used,omitempty"`
+	Confidence float64  `json:"confidence"`
+	Error      string   `json:"error,omitempty"`
+}
+
+func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.agent == nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(ChatResponse{
+			Error: "AI agent not configured. Set ai.provider in sentinel.yaml.",
+		})
+		return
+	}
+
+	var req ChatRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if req.SessionID == "" {
+		req.SessionID = fmt.Sprintf("session_%d", time.Now().UnixNano())
+	}
+
+	s.logger.Info().Str("session", req.SessionID).Str("msg", req.Message).Msg("chat request")
+
+	response, toolCalls, err := s.agent.Chat(r.Context(), req.Message, req.SessionID)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("agent chat error")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(ChatResponse{Error: err.Error()})
+		return
+	}
+
+	var toolNames []string
+	for _, tc := range toolCalls {
+		toolNames = append(toolNames, tc.ToolName)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(ChatResponse{
+		Response:  response,
+		ToolsUsed: toolNames,
+	})
+}
+
+func (s *Server) handleAgentStream(w http.ResponseWriter, r *http.Request) {
+	// SSE-based streaming for agent reasoning traces.
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	client := make(chan string, 20)
+	s.sseMu.Lock()
+	s.sseClients[client] = true
+	s.sseMu.Unlock()
+
+	defer func() {
+		s.sseMu.Lock()
+		delete(s.sseClients, client)
+		s.sseMu.Unlock()
+	}()
+
+	ctx := r.Context()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg := <-client:
+			fmt.Fprint(w, msg)
+			flusher.Flush()
+		}
+	}
+}
+
+// BroadcastAgentEvent sends an agent-specific SSE event.
+func (s *Server) BroadcastAgentEvent(eventType string, data interface{}) {
+	jsonData, _ := json.Marshal(data)
+	s.BroadcastEvent(eventType, string(jsonData))
 }
