@@ -1,0 +1,44 @@
+id: lolbin_abuse
+title: Living Off The Land Binary Abuse
+description: >
+  Detects abuse of LOLBins (Living Off The Land Binaries) beyond certutil. These are
+  legitimate Windows binaries abused by adversaries for download, execution, and evasion.
+  Covers mshta, regsvr32, bitsadmin, cmstp, msiexec, and others.
+severity: high
+status: active
+author: sentinel-ai
+tags:
+    - attack.defense_evasion
+    - attack.execution
+    - attack.t1218
+    - attack.t1218.005
+    - attack.t1218.010
+    - attack.t1218.011
+    - lolbin
+logsource:
+    category: process_creation
+    product: windows
+    service: ""
+detection:
+    selection_mshta:
+        raw|re: "(?i)mshta\\.exe.*(http|javascript|vbscript)"
+    selection_regsvr32:
+        raw|re: "(?i)regsvr32\\.exe.*(scrobj|/s|/i:http|/u)"
+    selection_bitsadmin:
+        raw|re: "(?i)bitsadmin.*(transfer|addfile).*(http|ftp)"
+    selection_cmstp:
+        raw|re: "(?i)cmstp\\.exe.*/s|/ni"
+    selection_msiexec_remote:
+        raw|re: "(?i)msiexec.*(http|ftp|/q)"
+    selection_wscript_net:
+        raw|re: "(?i)(wscript|cscript)\\.exe.*(http|\\\\\\\\)"
+    selection_forfiles:
+        raw|re: "(?i)forfiles.*/p.*cmd|/c.*powershell"
+    selection_pcalua:
+        raw|re: "(?i)pcalua\\.exe.*-a.*(http|cmd|powershell)"
+    condition: selection_mshta or selection_regsvr32 or selection_bitsadmin or selection_cmstp or selection_msiexec_remote or selection_wscript_net or selection_forfiles or selection_pcalua
+response:
+    - type: kill_process
+      target_field: pid
+    - type: alert
+      target_field: username

@@ -1,0 +1,41 @@
+id: kerberoasting_attack
+title: Kerberoasting Attack Detection
+description: >
+  Detects Kerberoasting attacks where adversaries request TGS tickets for service accounts
+  to crack offline. Indicators include use of Rubeus, Invoke-Kerberoast, or suspicious
+  Kerberos ticket requests (Event ID 4769) with RC4 encryption (0x17).
+severity: high
+status: active
+author: sentinel-ai
+tags:
+    - attack.credential_access
+    - attack.t1558.003
+    - kerberoasting
+    - kerberos
+logsource:
+    category: process_creation
+    product: windows
+    service: security
+detection:
+    selection_tools:
+        raw|contains:
+            - "Invoke-Kerberoast"
+            - "Rubeus kerberoast"
+            - "GetUserSPNs"
+            - "kerberoast"
+            - "asreproast"
+    selection_impacket:
+        raw|re: "(?i)impacket.*getST|GetUserSPNs\\.py"
+    selection_event_rc4:
+        raw|re: "(?i)4769.*0x17"
+    selection_powershell_tgs:
+        command_line|contains:
+            - "Add-Type -AssemblyName System.IdentityModel"
+            - "KerberosRequestorSecurityToken"
+            - "System.IdentityModel.Tokens"
+    condition: selection_tools or selection_impacket or selection_event_rc4 or selection_powershell_tgs
+response:
+    - type: alert
+      target_field: username
+    - type: disable_user
+      target_field: username

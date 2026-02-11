@@ -1,0 +1,41 @@
+id: dga_detection
+title: Domain Generation Algorithm Detection
+description: >
+  Detects potential DGA (Domain Generation Algorithm) activity used by malware families
+  to generate pseudo-random domain names for C2 communication. Identifies high-entropy
+  domain names, excessive NXDOMAIN responses, and patterns typical of DGA malware.
+severity: high
+status: active
+author: sentinel-ai
+tags:
+    - attack.command_and_control
+    - attack.t1568.002
+    - dga
+    - dns
+logsource:
+    category: network
+    product: ""
+    service: dns
+detection:
+    selection_high_entropy_domain:
+        raw|re: "(?i)query.*[bcdfghjklmnpqrstvwxz]{5,}.*\\.(com|net|org|info|biz|xyz|top|tk|ml|ga)"
+    selection_nxdomain_flood:
+        raw|contains:
+            - "NXDOMAIN"
+            - "SERVFAIL"
+            - "name does not exist"
+    selection_known_dga_tlds:
+        raw|re: "(?i)\\.[a-z0-9]{8,20}\\.(top|xyz|tk|ml|ga|cf|gq|pw|cc|ws)"
+    selection_rapid_unique_domains:
+        raw|re: "(?i)dns.*(query|request).*[a-z0-9]{12,}\\."
+    condition: selection_high_entropy_domain or selection_nxdomain_flood or selection_known_dga_tlds or selection_rapid_unique_domains
+correlation:
+    group_by:
+        - source_ip
+    threshold: 100
+    window: 5m
+response:
+    - type: alert
+      target_field: source_ip
+    - type: block_ip
+      target_field: source_ip

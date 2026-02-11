@@ -1,0 +1,57 @@
+id: c2_beaconing
+title: Command and Control Beaconing Detection
+description: >
+  Detects potential C2 beaconing patterns including periodic connections, known C2
+  frameworks, suspicious TLS/SSL certificates, and connections to dynamic DNS providers
+  and known malicious infrastructure indicators.
+severity: high
+status: active
+author: sentinel-ai
+tags:
+    - attack.command_and_control
+    - attack.t1071.001
+    - attack.t1573
+    - attack.t1571
+    - c2
+    - beaconing
+logsource:
+    category: network
+    product: ""
+    service: ""
+detection:
+    selection_c2_frameworks:
+        raw|contains:
+            - "cobalt strike"
+            - "cobaltstrike"
+            - "meterpreter"
+            - "empire agent"
+            - "sliver"
+            - "havoc"
+            - "brute ratel"
+            - "poshc2"
+            - "covenant"
+    selection_dynamic_dns:
+        raw|contains:
+            - ".duckdns.org"
+            - ".no-ip.com"
+            - ".no-ip.org"
+            - ".dynu.com"
+            - ".freedns.afraid.org"
+            - ".ngrok.io"
+            - ".serveo.net"
+            - ".portmap.io"
+    selection_suspicious_ports:
+        raw|re: "(?i)(connect|established).*(4444|5555|8443|8888|1337|31337|6666|6667)"
+    selection_encoded_payload:
+        raw|re: "(?i)(GET|POST).*(base64|eval|exec|cmd=|shell=|command=)"
+    condition: selection_c2_frameworks or selection_dynamic_dns or selection_suspicious_ports or selection_encoded_payload
+correlation:
+    group_by:
+        - destination_ip
+    threshold: 10
+    window: 10m
+response:
+    - type: alert
+      target_field: destination_ip
+    - type: block_ip
+      target_field: destination_ip

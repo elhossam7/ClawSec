@@ -1,0 +1,43 @@
+id: dll_sideloading
+title: DLL Sideloading / Injection Detection
+description: >
+  Detects DLL sideloading and injection techniques where adversaries load malicious DLLs
+  into legitimate processes. Monitors for known DLL injection APIs, suspicious DLL loading
+  from temp directories, and process hollowing indicators.
+severity: high
+status: active
+author: sentinel-ai
+tags:
+    - attack.defense_evasion
+    - attack.t1574.002
+    - attack.t1055.001
+    - dll_injection
+    - dll_sideloading
+logsource:
+    category: process_creation
+    product: windows
+    service: ""
+detection:
+    selection_injection_apis:
+        raw|contains:
+            - "VirtualAllocEx"
+            - "WriteProcessMemory"
+            - "CreateRemoteThread"
+            - "NtCreateThreadEx"
+            - "RtlCreateUserThread"
+            - "QueueUserAPC"
+    selection_dll_from_temp:
+        raw|re: "(?i)(\\\\temp\\\\|\\\\tmp\\\\|%temp%|%tmp%|appdata\\\\local\\\\temp).*\\.dll"
+    selection_rundll32_suspicious:
+        raw|re: "(?i)rundll32\\.exe.*(\\\\temp\\\\|\\\\downloads\\\\|\\\\users\\\\public\\\\)"
+    selection_process_hollowing:
+        raw|contains:
+            - "NtUnmapViewOfSection"
+            - "ZwUnmapViewOfSection"
+            - "SetThreadContext"
+    condition: selection_injection_apis or selection_dll_from_temp or selection_rundll32_suspicious or selection_process_hollowing
+response:
+    - type: kill_process
+      target_field: pid
+    - type: alert
+      target_field: username

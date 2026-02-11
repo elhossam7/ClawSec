@@ -41,6 +41,7 @@ func TestNewSQLite_CreatesAllTables(t *testing.T) {
 		"analysis_logs",
 		"tool_executions",
 		"chat_sessions",
+		"api_keys",
 	}
 
 	for _, table := range expected {

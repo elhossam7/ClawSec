@@ -1,0 +1,47 @@
+id: wmi_abuse
+title: WMI Abuse Detection
+description: >
+  Detects abuse of Windows Management Instrumentation (WMI) for lateral movement,
+  persistence, and execution. Monitors for WMIC process creation, WMI event subscriptions,
+  and remote WMI execution patterns used by adversaries.
+severity: high
+status: active
+author: sentinel-ai
+tags:
+    - attack.execution
+    - attack.lateral_movement
+    - attack.persistence
+    - attack.t1047
+    - attack.t1546.003
+    - wmi
+logsource:
+    category: process_creation
+    product: windows
+    service: ""
+detection:
+    selection_wmic_exec:
+        raw|re: "(?i)wmic.*(process\\s+call\\s+create|/node:)"
+    selection_wmi_subscription:
+        raw|contains:
+            - "__EventFilter"
+            - "__EventConsumer"
+            - "__FilterToConsumerBinding"
+            - "CommandLineEventConsumer"
+            - "ActiveScriptEventConsumer"
+    selection_remote_wmi:
+        raw|re: "(?i)wmic\\s+/node:\\s*['\"]?\\d+\\.\\d+\\.\\d+\\.\\d+"
+    selection_wmiprvse_spawn:
+        raw|re: "(?i)wmiprvse\\.exe.*-Embedding"
+    selection_powershell_wmi:
+        command_line|contains:
+            - "Invoke-WmiMethod"
+            - "Set-WmiInstance"
+            - "Get-WmiObject"
+            - "Invoke-CimMethod"
+            - "New-CimSession"
+    condition: selection_wmic_exec or selection_wmi_subscription or selection_remote_wmi or selection_wmiprvse_spawn or selection_powershell_wmi
+response:
+    - type: alert
+      target_field: source_ip
+    - type: kill_process
+      target_field: pid

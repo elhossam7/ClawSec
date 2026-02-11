@@ -1,0 +1,52 @@
+id: webshell_detection
+title: Web Shell Detection
+description: >
+  Detects web shell deployment and usage. Monitors for common web shell signatures,
+  suspicious file creation in web directories, and anomalous web server child processes
+  that indicate an attacker has planted a web shell for persistent access.
+severity: critical
+status: active
+author: sentinel-ai
+tags:
+    - attack.persistence
+    - attack.t1505.003
+    - webshell
+    - web_attack
+logsource:
+    category: file_creation
+    product: ""
+    service: ""
+detection:
+    selection_webshell_strings:
+        raw|contains:
+            - "eval(base64_decode"
+            - "eval($_POST"
+            - "eval($_GET"
+            - "eval($_REQUEST"
+            - "system($_GET"
+            - "passthru("
+            - "shell_exec("
+            - "<?php @eval"
+            - "Runtime.getRuntime().exec"
+            - "ProcessBuilder"
+    selection_webshell_tools:
+        raw|contains:
+            - "c99shell"
+            - "r57shell"
+            - "b374k"
+            - "weevely"
+            - "China Chopper"
+            - "WSO shell"
+            - "AntsWord"
+            - "Behinder"
+            - "Godzilla"
+    selection_web_dir_creation:
+        raw|re: "(?i)(wwwroot|htdocs|www|webapps|inetpub|nginx|apache|public_html).*\\.(php|jsp|aspx?|cfm|jspx)"
+    selection_web_server_child:
+        raw|re: "(?i)(w3wp|httpd|nginx|apache|tomcat)\\.exe.*(cmd|powershell|bash|sh)"
+    condition: selection_webshell_strings or selection_webshell_tools or selection_web_dir_creation or selection_web_server_child
+response:
+    - type: alert
+      target_field: source_ip
+    - type: block_ip
+      target_field: source_ip

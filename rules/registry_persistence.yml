@@ -1,0 +1,52 @@
+id: registry_persistence
+title: Registry Persistence Detection
+description: >
+  Detects modifications to Windows Registry keys commonly used for persistence.
+  Monitors Run/RunOnce keys, service creation, Winlogon modifications, AppInit_DLLs,
+  and image file execution options used by adversaries to maintain access.
+severity: high
+status: active
+author: sentinel-ai
+tags:
+    - attack.persistence
+    - attack.t1547.001
+    - attack.t1547.004
+    - attack.t1547.012
+    - registry
+logsource:
+    category: registry_event
+    product: windows
+    service: ""
+detection:
+    selection_run_keys:
+        raw|contains:
+            - "\\CurrentVersion\\Run"
+            - "\\CurrentVersion\\RunOnce"
+            - "\\CurrentVersion\\RunServices"
+            - "\\CurrentVersion\\RunServicesOnce"
+    selection_winlogon:
+        raw|contains:
+            - "\\Winlogon\\Shell"
+            - "\\Winlogon\\Userinit"
+            - "\\Winlogon\\Notify"
+    selection_appinit:
+        raw|contains:
+            - "\\Windows\\AppInit_DLLs"
+            - "\\Windows NT\\CurrentVersion\\AppCompatFlags"
+    selection_ifeo:
+        raw|re: "(?i)Image File Execution Options.*Debugger"
+    selection_services:
+        raw|re: "(?i)\\\\Services\\\\.*\\\\(ImagePath|ServiceDll)"
+    selection_startup:
+        raw|contains:
+            - "\\Explorer\\Shell Folders"
+            - "\\Explorer\\User Shell Folders"
+            - "\\CurrentVersion\\Explorer\\StartupApproved"
+    selection_schtask_reg:
+        raw|contains:
+            - "\\Schedule\\TaskCache\\Tasks"
+            - "\\Schedule\\TaskCache\\Tree"
+    condition: selection_run_keys or selection_winlogon or selection_appinit or selection_ifeo or selection_services or selection_startup or selection_schtask_reg
+response:
+    - type: alert
+      target_field: username

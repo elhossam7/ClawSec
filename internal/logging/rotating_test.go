@@ -390,10 +390,20 @@ func TestRotation_SizeResetsAfterRotate(t *testing.T) {
 	}
 	defer rw.Close()
 
-	// Exceed 1 MB to trigger rotation. The rotation happens first, then the
-	// full chunk is written to the newly-opened file. So rw.size == oneMB.
-	oneMB := 1024*1024 + 1
-	if _, err := rw.Write(writeChunk(oneMB)); err != nil {
+	// Write half of the 1 MB limit so we stay under after rotation.
+	halfMB := 512 * 1024
+	if _, err := rw.Write(writeChunk(halfMB)); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+
+	if rw.size != int64(halfMB) {
+		t.Fatalf("expected tracked size %d before rotation, got %d", halfMB, rw.size)
+	}
+
+	// Now write another chunk that pushes us past 1 MB → triggers rotation.
+	// After rotation: size resets to 0, then the chunk is written.
+	overflowChunk := 600 * 1024
+	if _, err := rw.Write(writeChunk(overflowChunk)); err != nil {
 		t.Fatalf("Write returned error: %v", err)
 	}
 
@@ -402,13 +412,18 @@ func TestRotation_SizeResetsAfterRotate(t *testing.T) {
 		t.Fatal("expected backup .1 to exist after rotation")
 	}
 
-	// Write a small marker; the tracked size should be oneMB + marker.
+	// After rotation + write, size should be exactly overflowChunk.
+	if rw.size != int64(overflowChunk) {
+		t.Errorf("expected tracked size %d after rotation, got %d", overflowChunk, rw.size)
+	}
+
+	// Write a small marker; size should be overflowChunk + marker.
 	marker := []byte("OK\n")
 	if _, err := rw.Write(marker); err != nil {
 		t.Fatalf("Write returned error: %v", err)
 	}
 
-	expected := int64(oneMB) + int64(len(marker))
+	expected := int64(overflowChunk) + int64(len(marker))
 	if rw.size != expected {
 		t.Errorf("expected tracked size %d, got %d", expected, rw.size)
 	}

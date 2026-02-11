@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
@@ -94,10 +95,10 @@ func (s *Server) validateAPIKey(key string) bool {
 	return false
 }
 
-// hashAPIKey creates a hex-encoded hash of the API key.
+// hashAPIKey creates a hex-encoded SHA256 hash of the API key.
 func hashAPIKey(key string) string {
-	// Use a simple hex encoding for now — in production you'd use SHA256.
-	return hex.EncodeToString([]byte(key))
+	h := sha256.Sum256([]byte(key))
+	return hex.EncodeToString(h[:])
 }
 
 // GenerateAPIKey creates a new random API key.

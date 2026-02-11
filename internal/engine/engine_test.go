@@ -1780,3 +1780,42 @@ func containsCheck(s, sub string) bool {
 	}
 	return false
 }
+
+// ---------------------------------------------------------------------------
+// Validate all production rules can load, compile, and pass schema validation
+// ---------------------------------------------------------------------------
+
+func TestProductionRules_LoadAndCompile(t *testing.T) {
+	rulesDir := filepath.Join("..", "..", "rules")
+	if _, err := os.Stat(rulesDir); os.IsNotExist(err) {
+		t.Skip("rules directory not found")
+	}
+
+	eng := newTestEngine(make(chan types.LogEvent, 100))
+	if err := eng.LoadRules(rulesDir); err != nil {
+		t.Fatalf("failed to load production rules: %v", err)
+	}
+
+	if eng.RuleCount() == 0 {
+		t.Fatal("no rules loaded from production rules directory")
+	}
+
+	t.Logf("loaded %d production rules", eng.RuleCount())
+
+	// Verify each rule compiles and has required fields.
+	for _, cr := range eng.GetRules() {
+		if cr.ID == "" {
+			t.Errorf("rule has empty ID: %+v", cr)
+		}
+		if cr.Title == "" {
+			t.Errorf("rule %s has empty title", cr.ID)
+		}
+		if cr.Severity == 0 {
+			t.Errorf("rule %s has zero severity", cr.ID)
+		}
+		// A valid rule must have either simple conditions or named condition groups.
+		if len(cr.Conditions) == 0 && len(cr.ConditionGroups) == 0 {
+			t.Errorf("rule %s has no compiled conditions or condition groups", cr.ID)
+		}
+	}
+}

@@ -178,7 +178,7 @@ func (a *Agent) callLLMWithRetry(ctx context.Context, messages []Message, tools 
 
 // tryFallbackModels iterates through configured fallback models, attempting
 // each one in order. The original model is restored before returning.
-func (a *Agent) tryFallbackModels(ctx context.Context, messages []Message, tools []ToolDef, originalErr error) (*LLMResponse, error) {
+func (a *Agent) tryFallbackModels(ctx context.Context, messages []Message, tools []ToolDef, _ error) (*LLMResponse, error) {
 	fallbacks := a.cfg.FallbackModels
 	if len(fallbacks) == 0 {
 		return nil, fmt.Errorf("no fallback models configured")
@@ -664,8 +664,8 @@ func rawToMap(raw json.RawMessage) map[string]interface{} {
 // ---------------------------------------------------------------------------
 
 const (
-	maxToolOutputLen = 16000  // ~4000 tokens — keeps context window manageable.
-	maxErrorLen      = 500    // Errors don't need to be long.
+	maxToolOutputLen = 16000 // ~4000 tokens — keeps context window manageable.
+	maxErrorLen      = 500   // Errors don't need to be long.
 )
 
 // sanitizeToolOutput truncates oversized output, strips prompt-injection

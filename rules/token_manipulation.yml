@@ -1,0 +1,55 @@
+id: token_manipulation
+title: Token Impersonation and Privilege Manipulation
+description: >
+  Detects token manipulation techniques where adversaries steal or forge authentication
+  tokens to escalate privileges or impersonate users. Covers token theft, named pipe
+  impersonation, Potato exploits, and token duplication attacks.
+severity: critical
+status: active
+author: sentinel-ai
+tags:
+    - attack.privilege_escalation
+    - attack.defense_evasion
+    - attack.t1134.001
+    - attack.t1134.002
+    - attack.t1134.003
+    - token_manipulation
+logsource:
+    category: process_creation
+    product: windows
+    service: security
+detection:
+    selection_token_tools:
+        raw|contains:
+            - "incognito"
+            - "Invoke-TokenManipulation"
+            - "ImpersonateLoggedOnUser"
+            - "DuplicateTokenEx"
+            - "CreateProcessAsUser"
+            - "CreateProcessWithToken"
+    selection_potato_exploits:
+        raw|contains:
+            - "JuicyPotato"
+            - "RottenPotato"
+            - "SweetPotato"
+            - "PrintSpoofer"
+            - "GodPotato"
+            - "EfsPotato"
+            - "RoguePotato"
+    selection_named_pipe:
+        raw|re: "(?i)(ImpersonateNamedPipeClient|CreateNamedPipe.*PIPE_ACCESS)"
+    selection_event_token:
+        raw|re: "(?i)(4672|4673|4674).*SeDebugPrivilege"
+    selection_maketoken:
+        raw|contains:
+            - "sekurlsa::pth"
+            - "Invoke-Mimikatz"
+            - "maketoken"
+    condition: selection_token_tools or selection_potato_exploits or selection_named_pipe or selection_event_token or selection_maketoken
+response:
+    - type: kill_process
+      target_field: pid
+    - type: alert
+      target_field: username
+    - type: disable_user
+      target_field: username

@@ -18,9 +18,10 @@ type Memory interface {
 
 // SQLiteMemory implements Memory using the existing SQLite database.
 type SQLiteMemory struct {
-	db    *sql.DB
-	cache map[string]*cacheEntry
-	mu    sync.RWMutex
+	db       *sql.DB
+	cache    map[string]*cacheEntry
+	mu       sync.RWMutex
+	cacheTTL time.Duration
 }
 
 type cacheEntry struct {
@@ -31,14 +32,65 @@ type cacheEntry struct {
 // NewSQLiteMemory creates a memory manager backed by SQLite.
 func NewSQLiteMemory(db *sql.DB) (*SQLiteMemory, error) {
 	m := &SQLiteMemory{
-		db:    db,
-		cache: make(map[string]*cacheEntry),
+		db:       db,
+		cache:    make(map[string]*cacheEntry),
+		cacheTTL: 5 * time.Minute,
 	}
+
+	// Start cache cleanup goroutine.
+	go m.cleanupCache()
+
 	return m, nil
+}
+
+// cacheGet retrieves a value from the in-memory cache. Returns "" if absent or expired.
+func (m *SQLiteMemory) cacheGet(key string) (string, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	entry, ok := m.cache[key]
+	if !ok || time.Now().After(entry.expiresAt) {
+		return "", false
+	}
+	return entry.value, true
+}
+
+// cacheSet stores a value in the in-memory cache with TTL.
+func (m *SQLiteMemory) cacheSet(key, value string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.cache[key] = &cacheEntry{
+		value:     value,
+		expiresAt: time.Now().Add(m.cacheTTL),
+	}
+}
+
+// cleanupCache periodically prunes expired entries.
+func (m *SQLiteMemory) cleanupCache() {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		m.mu.Lock()
+		now := time.Now()
+		for k, v := range m.cache {
+			if now.After(v.expiresAt) {
+				delete(m.cache, k)
+			}
+		}
+		m.mu.Unlock()
+	}
 }
 
 // StoreLearning persists a learned fact (e.g. "10.0.0.5 is Jenkins server").
 func (m *SQLiteMemory) StoreLearning(fact, source string, confidence float64) error {
+	// Invalidate context caches since a new fact may affect them.
+	m.mu.Lock()
+	for k := range m.cache {
+		if strings.HasPrefix(k, "ctx:") {
+			delete(m.cache, k)
+		}
+	}
+	m.mu.Unlock()
+
 	// Deduplicate: update if same fact already exists.
 	var existing int
 	err := m.db.QueryRow("SELECT COUNT(*) FROM agent_memory WHERE fact = ?", fact).Scan(&existing)
@@ -62,6 +114,12 @@ func (m *SQLiteMemory) StoreLearning(fact, source string, confidence float64) er
 
 // GetRelevantContext retrieves facts relevant to an incident.
 func (m *SQLiteMemory) GetRelevantContext(incidentID, sourceIP, ruleID string) (string, error) {
+	// Check cache first.
+	cacheKey := "ctx:" + incidentID + ":" + sourceIP + ":" + ruleID
+	if cached, ok := m.cacheGet(cacheKey); ok {
+		return cached, nil
+	}
+
 	var facts []string
 
 	// Search for facts mentioning the source IP.
@@ -119,7 +177,12 @@ func (m *SQLiteMemory) GetRelevantContext(incidentID, sourceIP, ruleID string) (
 		m.db.Exec("UPDATE agent_memory SET last_accessed = CURRENT_TIMESTAMP, access_count = access_count + 1 WHERE fact = ?", f)
 	}
 
-	return "Known facts:\n- " + strings.Join(facts, "\n- "), nil
+	result := "Known facts:\n- " + strings.Join(facts, "\n- ")
+
+	// Populate cache.
+	m.cacheSet(cacheKey, result)
+
+	return result, nil
 }
 
 // StoreContext saves a chat session's context.
@@ -130,15 +193,26 @@ func (m *SQLiteMemory) StoreContext(sessionID, context string) error {
 		 ON CONFLICT(session_id) DO UPDATE SET context = ?, updated_at = CURRENT_TIMESTAMP`,
 		sessionID, context, context,
 	)
+	if err == nil {
+		m.cacheSet("session:"+sessionID, context)
+	}
 	return err
 }
 
 // GetContext retrieves a chat session's context.
 func (m *SQLiteMemory) GetContext(sessionID string) (string, error) {
+	// Check cache first.
+	if cached, ok := m.cacheGet("session:" + sessionID); ok {
+		return cached, nil
+	}
+
 	var ctx string
 	err := m.db.QueryRow("SELECT context FROM chat_sessions WHERE session_id = ?", sessionID).Scan(&ctx)
 	if err == sql.ErrNoRows {
 		return "", nil
+	}
+	if err == nil {
+		m.cacheSet("session:"+sessionID, ctx)
 	}
 	return ctx, err
 }

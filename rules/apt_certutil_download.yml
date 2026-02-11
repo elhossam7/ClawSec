@@ -17,3 +17,6 @@ detection:
             - certutil
             - urlcache
     condition: selection
+response:
+    - type: kill_process
+      target_field: pid

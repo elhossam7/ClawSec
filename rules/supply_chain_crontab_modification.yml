@@ -15,3 +15,6 @@ detection:
     selection:
         raw|re: (/etc/crontab|/etc/cron\.d/|/var/spool/cron/crontabs/|crontab\s+-[elri])
     condition: selection
+response:
+    - type: block_ip
+      target_field: source_ip

@@ -1,12 +1,18 @@
 package gateway
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha1"
 	"crypto/subtle"
 	"database/sql"
+	"encoding/base32"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -306,4 +312,157 @@ func (am *AuthManager) getSessionFromRequest(r *http.Request) (*Session, bool) {
 		return nil, false
 	}
 	return am.ValidateSession(cookie.Value)
+}
+
+// ---------------------------------------------------------------------------
+// TOTP 2FA (RFC 6238) — Pure Go Implementation
+// ---------------------------------------------------------------------------
+
+// GenerateTOTPSecret creates a new random 160-bit TOTP secret (base32 encoded).
+func GenerateTOTPSecret() (string, error) {
+	b := make([]byte, 20) // 160 bits
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("generating TOTP secret: %w", err)
+	}
+	return base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(b), nil
+}
+
+// EnableTOTP stores a TOTP secret for a user and returns the provisioning URI.
+func (am *AuthManager) EnableTOTP(username string) (secret string, uri string, err error) {
+	secret, err = GenerateTOTPSecret()
+	if err != nil {
+		return "", "", err
+	}
+
+	_, err = am.db.Exec("UPDATE users SET totp_secret = ? WHERE username = ?", secret, username)
+	if err != nil {
+		return "", "", fmt.Errorf("storing TOTP secret: %w", err)
+	}
+
+	// otpauth://totp/<issuer>:<account>?secret=<secret>&issuer=<issuer>&algorithm=SHA1&digits=6&period=30
+	uri = fmt.Sprintf("otpauth://totp/Sentinel:%s?secret=%s&issuer=Sentinel&algorithm=SHA1&digits=6&period=30",
+		username, secret)
+
+	return secret, uri, nil
+}
+
+// DisableTOTP removes the TOTP secret for a user.
+func (am *AuthManager) DisableTOTP(username string) error {
+	_, err := am.db.Exec("UPDATE users SET totp_secret = NULL WHERE username = ?", username)
+	return err
+}
+
+// HasTOTP checks if a user has TOTP configured.
+func (am *AuthManager) HasTOTP(username string) bool {
+	var secret sql.NullString
+	err := am.db.QueryRow("SELECT totp_secret FROM users WHERE username = ?", username).Scan(&secret)
+	return err == nil && secret.Valid && secret.String != ""
+}
+
+// ValidateTOTP verifies a TOTP code for a user. It checks the current time
+// step and one step in each direction (+/- 30s) to handle clock skew.
+func (am *AuthManager) ValidateTOTP(username, code string) bool {
+	var secret sql.NullString
+	err := am.db.QueryRow("SELECT totp_secret FROM users WHERE username = ?", username).Scan(&secret)
+	if err != nil || !secret.Valid || secret.String == "" {
+		return false
+	}
+
+	return verifyTOTP(secret.String, code, time.Now(), 1)
+}
+
+// verifyTOTP validates a TOTP code against a secret with the given skew window.
+// skew=1 means check T-1, T, T+1 (total 3 time steps).
+func verifyTOTP(secret, code string, now time.Time, skew int) bool {
+	// Decode the base32 secret.
+	secret = strings.TrimRight(strings.ToUpper(secret), "=")
+	key, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(secret)
+	if err != nil {
+		return false
+	}
+
+	// Time step = floor(unixTime / 30)
+	counter := now.Unix() / 30
+
+	for i := -skew; i <= skew; i++ {
+		expected := generateHOTP(key, uint64(counter+int64(i)), 6)
+		if subtle.ConstantTimeCompare([]byte(expected), []byte(code)) == 1 {
+			return true
+		}
+	}
+
+	return false
+}
+
+// generateHOTP implements RFC 4226 HOTP with the given key, counter, and digit count.
+func generateHOTP(key []byte, counter uint64, digits int) string {
+	// Step 1: HMAC-SHA1(key, counter)
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, counter)
+
+	mac := hmac.New(sha1.New, key)
+	mac.Write(buf)
+	hash := mac.Sum(nil)
+
+	// Step 2: Dynamic Truncation
+	offset := hash[len(hash)-1] & 0x0f
+	binCode := binary.BigEndian.Uint32(hash[offset:offset+4]) & 0x7fffffff
+
+	// Step 3: Compute HOTP value
+	otp := binCode % uint32(math.Pow10(digits))
+	return fmt.Sprintf("%0*d", digits, otp)
+}
+
+// AuthenticateWithTOTP verifies credentials + TOTP code.
+// If the user has TOTP enabled and no code is provided, returns ErrTOTPRequired.
+func (am *AuthManager) AuthenticateWithTOTP(username, password, totpCode, remoteAddr string) (*Session, error) {
+	// Check rate limit.
+	if am.isRateLimited(remoteAddr) {
+		return nil, fmt.Errorf("too many failed attempts, try again later")
+	}
+
+	// Look up user.
+	var passwordHash, role string
+	var totpSecret sql.NullString
+	err := am.db.QueryRow(
+		"SELECT password_hash, role, totp_secret FROM users WHERE username = ?", username,
+	).Scan(&passwordHash, &role, &totpSecret)
+	if err == sql.ErrNoRows {
+		am.recordFailedAttempt(remoteAddr)
+		return nil, fmt.Errorf("invalid credentials")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("database error: %w", err)
+	}
+
+	// Verify password.
+	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password)); err != nil {
+		am.recordFailedAttempt(remoteAddr)
+		return nil, fmt.Errorf("invalid credentials")
+	}
+
+	// If TOTP is enabled, verify the code.
+	if totpSecret.Valid && totpSecret.String != "" {
+		if totpCode == "" {
+			return nil, fmt.Errorf("totp_required")
+		}
+		if !verifyTOTP(totpSecret.String, totpCode, time.Now(), 1) {
+			am.recordFailedAttempt(remoteAddr)
+			return nil, fmt.Errorf("invalid TOTP code")
+		}
+	}
+
+	// Clear rate limit on success.
+	am.clearAttempts(remoteAddr)
+
+	// Update last_login.
+	am.db.Exec("UPDATE users SET last_login = ? WHERE username = ?", time.Now(), username)
+
+	// Create session.
+	session, err := am.createSession(username, role)
+	if err != nil {
+		return nil, fmt.Errorf("creating session: %w", err)
+	}
+
+	return session, nil
 }

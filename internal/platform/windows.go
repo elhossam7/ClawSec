@@ -142,7 +142,7 @@ while ($true) {
 		select {
 		case events <- ev:
 		case <-ctx.Done():
-			break
+			return nil
 		}
 	}
 

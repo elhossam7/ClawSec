@@ -36,10 +36,55 @@ type RuleLogSource struct {
 }
 
 // RuleDetection defines the matching logic.
+// Supports both simple (single "selection" key) and SIGMA-style named selections
+// (selection_*, condition string with "or"/"and" logic).
 type RuleDetection struct {
-	Selection map[string]interface{} `yaml:"selection"`        // Field conditions
-	Filter    map[string]interface{} `yaml:"filter,omitempty"` // Exclusions
-	Condition string                 `yaml:"condition"`        // "selection", "selection and not filter"
+	Selection  map[string]interface{}            `yaml:"selection"`        // Simple single selection
+	Selections map[string]map[string]interface{} `yaml:"-"`                // Named selections (populated by custom unmarshal)
+	Filter     map[string]interface{}            `yaml:"filter,omitempty"` // Exclusions
+	Condition  string                            `yaml:"condition"`        // "selection", "selection_a or selection_b"
+}
+
+// UnmarshalYAML implements a custom YAML unmarshaler for RuleDetection that
+// captures named selection blocks (selection_*) alongside the standard keys.
+func (d *RuleDetection) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind != yaml.MappingNode {
+		return fmt.Errorf("detection must be a mapping")
+	}
+
+	d.Selections = make(map[string]map[string]interface{})
+
+	for i := 0; i+1 < len(value.Content); i += 2 {
+		key := value.Content[i].Value
+		val := value.Content[i+1]
+
+		switch {
+		case key == "selection":
+			// Decode single "selection" into the Selection map.
+			var sel map[string]interface{}
+			if err := val.Decode(&sel); err != nil {
+				return fmt.Errorf("decoding selection: %w", err)
+			}
+			d.Selection = sel
+		case key == "filter":
+			var f map[string]interface{}
+			if err := val.Decode(&f); err != nil {
+				return fmt.Errorf("decoding filter: %w", err)
+			}
+			d.Filter = f
+		case key == "condition":
+			d.Condition = val.Value
+		case strings.HasPrefix(key, "selection_"):
+			// Named selection — store in Selections map.
+			var sel map[string]interface{}
+			if err := val.Decode(&sel); err != nil {
+				return fmt.Errorf("decoding %s: %w", key, err)
+			}
+			d.Selections[key] = sel
+		}
+	}
+
+	return nil
 }
 
 // RuleCorrelation enables threshold/window-based detection.
@@ -57,18 +102,20 @@ type RuleAction struct {
 
 // CompiledRule is a pre-compiled, ready-to-evaluate rule.
 type CompiledRule struct {
-	ID          string
-	Title       string
-	Description string
-	Severity    types.Severity
-	Enabled     bool
-	Tags        []string
-	LogSource   RuleLogSource
-	Conditions  []Condition
-	Filters     []Condition
-	Correlation *RuleCorrelation
-	Actions     []RuleAction
-	MessageTpl  string
+	ID              string
+	Title           string
+	Description     string
+	Severity        types.Severity
+	Enabled         bool
+	Tags            []string
+	LogSource       RuleLogSource
+	Conditions      []Condition   // Single selection: all must match (AND)
+	ConditionGroups [][]Condition // Named selections: groups OR'd, conditions within AND'd
+	ConditionLogic  string        // "and" or "or" — how groups combine
+	Filters         []Condition
+	Correlation     *RuleCorrelation
+	Actions         []RuleAction
+	MessageTpl      string
 }
 
 // Condition is a single compiled match condition.
@@ -157,7 +204,23 @@ func CompileRule(rule Rule) (*CompiledRule, error) {
 		MessageTpl:  fmt.Sprintf("[%s] %s", rule.Severity, rule.Title),
 	}
 
-	// Compile selection conditions.
+	// Compile named selections (selection_*) if present.
+	if len(rule.Detection.Selections) > 0 {
+		compiled.ConditionLogic = parseConditionLogic(rule.Detection.Condition)
+		for name, selMap := range rule.Detection.Selections {
+			var group []Condition
+			for field, value := range selMap {
+				cond, err := compileCondition(field, value)
+				if err != nil {
+					return nil, fmt.Errorf("compiling %s field %q: %w", name, field, err)
+				}
+				group = append(group, cond)
+			}
+			compiled.ConditionGroups = append(compiled.ConditionGroups, group)
+		}
+	}
+
+	// Compile simple "selection" conditions (backward-compatible).
 	for field, value := range rule.Detection.Selection {
 		cond, err := compileCondition(field, value)
 		if err != nil {
@@ -176,6 +239,17 @@ func CompileRule(rule Rule) (*CompiledRule, error) {
 	}
 
 	return compiled, nil
+}
+
+// parseConditionLogic extracts the logical operator from a SIGMA condition string.
+// Returns "or" if any "or" is found (e.g., "selection_a or selection_b"),
+// "and" if "and" is found, defaults to "or" for named selections.
+func parseConditionLogic(condition string) string {
+	lower := strings.ToLower(condition)
+	if strings.Contains(lower, " and ") && !strings.Contains(lower, " or ") {
+		return "and"
+	}
+	return "or" // Default: named selections are OR'd
 }
 
 // compileCondition compiles a single field/value pair into a Condition.
@@ -242,11 +316,52 @@ func (cr *CompiledRule) Matches(event types.LogEvent) bool {
 		return false
 	}
 
-	// All selection conditions must match.
-	for _, cond := range cr.Conditions {
-		if !cond.Evaluate(event) {
-			return false
+	matched := false
+
+	// Evaluate named selection groups (SIGMA-style).
+	if len(cr.ConditionGroups) > 0 {
+		if cr.ConditionLogic == "and" {
+			// All groups must match.
+			matched = true
+			for _, group := range cr.ConditionGroups {
+				if !matchGroup(group, event) {
+					matched = false
+					break
+				}
+			}
+		} else {
+			// Any group matching is sufficient (OR).
+			for _, group := range cr.ConditionGroups {
+				if matchGroup(group, event) {
+					matched = true
+					break
+				}
+			}
 		}
+	}
+
+	// Evaluate simple selection conditions (all must match — AND).
+	if len(cr.Conditions) > 0 {
+		allMatch := true
+		for _, cond := range cr.Conditions {
+			if !cond.Evaluate(event) {
+				allMatch = false
+				break
+			}
+		}
+		if allMatch {
+			matched = true
+		}
+	}
+
+	// If neither condition groups nor simple conditions exist, match everything
+	// (a rule with no detection logic is a catch-all).
+	if len(cr.ConditionGroups) == 0 && len(cr.Conditions) == 0 {
+		matched = true
+	}
+
+	if !matched {
+		return false
 	}
 
 	// If any filter matches, the event is excluded.
@@ -257,6 +372,16 @@ func (cr *CompiledRule) Matches(event types.LogEvent) bool {
 	}
 
 	return true
+}
+
+// matchGroup returns true if all conditions in the group match (AND within a group).
+func matchGroup(group []Condition, event types.LogEvent) bool {
+	for _, cond := range group {
+		if !cond.Evaluate(event) {
+			return false
+		}
+	}
+	return len(group) > 0
 }
 
 // Evaluate checks a single condition against an event.
