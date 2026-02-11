@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sentinel — {{.Title}}</title>
+    <title>ClawSec — {{.Title}}</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Cpath d='M18 2L4 9v9c0 8.3 5.9 16 14 18 8.1-2 14-9.7 14-18V9L18 2z' fill='%2300d4ff'/%3E%3C/svg%3E">
     <script src="https://unpkg.com/htmx.org@2.0.0"></script>
     <script src="https://unpkg.com/htmx-ext-sse@2.0.0/sse.js"></script>
@@ -24,13 +24,13 @@
                     <circle cx="18" cy="17" r="3" fill="#00d4ff"/>
                     <circle cx="18" cy="17" r="5.5" stroke="#00d4ff" stroke-width="0.6" opacity="0.3"/>
                 </svg>
-                <div class="brand-text"><span>Sentinel</span></div>
+                <div class="brand-text"><span>ClawSec</span></div>
             </div>
 
             <nav class="sidebar-nav">
                 <div class="nav-section-label">Monitor</div>
 
-                <a href="/" hx-get="/" hx-target="#main-content" hx-push-url="true"
+                <a href="/dashboard" hx-get="/dashboard" hx-target="#main-content" hx-push-url="true"
                    class="nav-item {{if eq .Page "dashboard"}}active{{end}}">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="3" y="3" width="7" height="7" rx="1"/>

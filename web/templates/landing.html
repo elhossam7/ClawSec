@@ -1,0 +1,520 @@
+{{define "landing"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClawSec — AI-Powered Blue Team Defense Agent</title>
+    <meta name="description" content="ClawSec is a cross-platform security monitoring agent with real-time threat detection, SIGMA-compatible rules, and AI-powered defensive responses.">
+    <meta name="keywords" content="security, SIEM, threat detection, SIGMA, blue team, SOC, incident response, AI security, ClawSec">
+    <meta property="og:title" content="ClawSec — AI-Powered Blue Team Defense Agent">
+    <meta property="og:description" content="Real-time threat detection and semi-automated defensive responses for your infrastructure.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://github.com/elhossam7/ClawSec">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Cpath d='M18 2L4 9v9c0 8.3 5.9 16 14 18 8.1-2 14-9.7 14-18V9L18 2z' fill='%2300d4ff'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="/static/css/landing.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Animated Background -->
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+    <div class="bg-glow bg-glow-3"></div>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-brand">
+                <svg class="nav-logo" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18 2L4 9v9c0 8.3 5.9 16 14 18 8.1-2 14-9.7 14-18V9L18 2z"
+                          stroke="#00d4ff" stroke-width="1.5" fill="rgba(0,212,255,0.1)"/>
+                    <path d="M18 8l-8 4v5c0 5 3.6 9.6 8 10.8 4.4-1.2 8-5.8 8-10.8v-5l-8-4z"
+                          fill="rgba(0,212,255,0.15)"/>
+                    <circle cx="18" cy="17" r="3" fill="#00d4ff"/>
+                    <circle cx="18" cy="17" r="5.5" stroke="#00d4ff" stroke-width="0.6" opacity="0.4"/>
+                </svg>
+                <span class="nav-brand-text">ClawSec</span>
+            </a>
+            <div class="nav-links">
+                <a href="#features" class="nav-link">Features</a>
+                <a href="#architecture" class="nav-link">Architecture</a>
+                <a href="#detection" class="nav-link">Detection</a>
+                <a href="https://github.com/elhossam7/ClawSec" target="_blank" class="nav-link">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    GitHub
+                </a>
+                <a href="/dashboard" class="nav-btn">Dashboard</a>
+            </div>
+            <button class="nav-toggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-container">
+            <div class="hero-badge">
+                <span class="badge-pulse"></span>
+                <span>Open Source Security</span>
+            </div>
+            <h1 class="hero-title">
+                <span class="gradient-text">AI-Powered</span> Blue Team<br>
+                Defense Agent
+            </h1>
+            <p class="hero-subtitle">
+                ClawSec watches your systems in real-time, detects threats using SIGMA-compatible rules, 
+                and orchestrates semi-automated defensive responses with AI assistance.
+            </p>
+            <div class="hero-actions">
+                <a href="https://github.com/elhossam7/ClawSec" target="_blank" class="btn btn-primary">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    View on GitHub
+                </a>
+                <a href="#features" class="btn btn-secondary">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polygon points="10 8 16 12 10 16 10 8" fill="currentColor"/>
+                    </svg>
+                    Learn More
+                </a>
+            </div>
+            <div class="hero-stats">
+                <div class="stat">
+                    <span class="stat-value">35+</span>
+                    <span class="stat-label">Detection Rules</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat">
+                    <span class="stat-value">Real-time</span>
+                    <span class="stat-label">Monitoring</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat">
+                    <span class="stat-value">AI</span>
+                    <span class="stat-label">Powered</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hero Visual -->
+        <div class="hero-visual">
+            <div class="terminal-window">
+                <div class="terminal-header">
+                    <div class="terminal-dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                    <span class="terminal-title">clawsec monitor</span>
+                </div>
+                <div class="terminal-body">
+                    <div class="terminal-line">
+                        <span class="prompt">$</span>
+                        <span class="command">clawsec start --watch</span>
+                    </div>
+                    <div class="terminal-line output">
+                        <span class="time">[14:32:01]</span>
+                        <span class="level info">INFO</span>
+                        <span>Engine initialized with 35 rules</span>
+                    </div>
+                    <div class="terminal-line output">
+                        <span class="time">[14:32:01]</span>
+                        <span class="level info">INFO</span>
+                        <span>WebUI listening on :8080</span>
+                    </div>
+                    <div class="terminal-line output">
+                        <span class="time">[14:32:15]</span>
+                        <span class="level warn">ALERT</span>
+                        <span class="alert-text">Suspicious PowerShell detected</span>
+                    </div>
+                    <div class="terminal-line output">
+                        <span class="time">[14:32:15]</span>
+                        <span class="level info">INFO</span>
+                        <span>Response action queued for approval</span>
+                    </div>
+                    <div class="terminal-line output">
+                        <span class="time">[14:32:18]</span>
+                        <span class="level success">OK</span>
+                        <span>Telegram alert sent successfully</span>
+                    </div>
+                    <div class="terminal-line">
+                        <span class="prompt">$</span>
+                        <span class="cursor"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="section-container">
+            <div class="section-header">
+                <span class="section-tag">Capabilities</span>
+                <h2 class="section-title">Enterprise-Grade Security,<br>Open Source Freedom</h2>
+                <p class="section-subtitle">
+                    Built for security teams who need powerful threat detection without vendor lock-in.
+                </p>
+            </div>
+
+            <div class="features-grid">
+                <div class="feature-card feature-highlight">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            <path d="M9 12l2 2 4-4"/>
+                        </svg>
+                    </div>
+                    <h3>SIGMA-Compatible Detection</h3>
+                    <p>Use industry-standard SIGMA rules or create custom detection logic with our extended format. Compatible with existing rule repositories.</p>
+                    <div class="feature-tags">
+                        <span>SIGMA</span>
+                        <span>YAML</span>
+                        <span>Custom Rules</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                            <circle cx="12" cy="10" r="1" fill="currentColor"/>
+                            <circle cx="8" cy="10" r="1" fill="currentColor"/>
+                            <circle cx="16" cy="10" r="1" fill="currentColor"/>
+                        </svg>
+                    </div>
+                    <h3>AI SOC Assistant</h3>
+                    <p>Chat with an AI agent that understands your security context and can help investigate incidents, analyze logs, and suggest responses.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="2" y="3" width="20" height="14" rx="2"/>
+                            <path d="M8 21h8"/>
+                            <path d="M12 17v4"/>
+                            <path d="M6 8h.01M9 8h.01"/>
+                        </svg>
+                    </div>
+                    <h3>Cross-Platform Agent</h3>
+                    <p>Native support for Linux and Windows with platform-specific log collection and response actions. Deploy anywhere.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                        </svg>
+                    </div>
+                    <h3>Real-Time Monitoring</h3>
+                    <p>Continuous log ingestion with instant threat detection. See alerts as they happen through the WebUI or Telegram notifications.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+                        </svg>
+                    </div>
+                    <h3>Automated Response</h3>
+                    <p>Define response actions that execute automatically or require approval. Block IPs, kill processes, or trigger custom scripts.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/>
+                        </svg>
+                    </div>
+                    <h3>Telegram Integration</h3>
+                    <p>Receive alerts and approve response actions directly from Telegram. Stay informed and respond from anywhere.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Architecture Section -->
+    <section class="architecture" id="architecture">
+        <div class="section-container">
+            <div class="section-header">
+                <span class="section-tag">How It Works</span>
+                <h2 class="section-title">Modular Architecture,<br>Maximum Flexibility</h2>
+            </div>
+
+            <div class="arch-diagram">
+                <div class="arch-flow">
+                    <div class="arch-node">
+                        <div class="arch-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                            </svg>
+                        </div>
+                        <span class="arch-label">Log Sources</span>
+                        <span class="arch-desc">Syslog, Windows Events, Custom</span>
+                    </div>
+
+                    <div class="arch-connector">
+                        <svg viewBox="0 0 40 24"><path d="M0 12h40M32 4l8 8-8 8" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                    </div>
+
+                    <div class="arch-node highlight">
+                        <div class="arch-icon">
+                            <svg viewBox="0 0 36 36" fill="none">
+                                <path d="M18 2L4 9v9c0 8.3 5.9 16 14 18 8.1-2 14-9.7 14-18V9L18 2z"
+                                      stroke="currentColor" stroke-width="1.5" fill="rgba(0,212,255,0.1)"/>
+                                <circle cx="18" cy="17" r="3" fill="currentColor"/>
+                            </svg>
+                        </div>
+                        <span class="arch-label">ClawSec Engine</span>
+                        <span class="arch-desc">Detection & Correlation</span>
+                    </div>
+
+                    <div class="arch-connector">
+                        <svg viewBox="0 0 40 24"><path d="M0 12h40M32 4l8 8-8 8" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                    </div>
+
+                    <div class="arch-node">
+                        <div class="arch-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                                <path d="M13.73 21a2 2 0 01-3.46 0"/>
+                            </svg>
+                        </div>
+                        <span class="arch-label">Alerts</span>
+                        <span class="arch-desc">WebUI, Telegram, Webhooks</span>
+                    </div>
+
+                    <div class="arch-connector">
+                        <svg viewBox="0 0 40 24"><path d="M0 12h40M32 4l8 8-8 8" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                    </div>
+
+                    <div class="arch-node">
+                        <div class="arch-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                <path d="M9 12l2 2 4-4"/>
+                            </svg>
+                        </div>
+                        <span class="arch-label">Response</span>
+                        <span class="arch-desc">Automated or Approved</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tech-stack">
+                <div class="tech-item">
+                    <div class="tech-logo">Go</div>
+                    <span>Core Agent</span>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-logo">htmx</div>
+                    <span>WebUI</span>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-logo">SQLite</div>
+                    <span>Storage</span>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-logo">SIGMA</div>
+                    <span>Rules</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Detection Rules Section -->
+    <section class="detection" id="detection">
+        <div class="section-container">
+            <div class="section-header">
+                <span class="section-tag">Detection</span>
+                <h2 class="section-title">Pre-Built Rules for<br>Real-World Threats</h2>
+                <p class="section-subtitle">
+                    35+ detection rules covering common attack techniques, from credential theft to lateral movement.
+                </p>
+            </div>
+
+            <div class="rules-showcase">
+                <div class="rules-categories">
+                    <div class="rule-category">
+                        <div class="category-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
+                            <span>Credential Attacks</span>
+                        </div>
+                        <ul class="rule-list">
+                            <li>Credential Dumping (LSASS)</li>
+                            <li>Kerberoasting Attack</li>
+                            <li>Pass-the-Hash Detection</li>
+                            <li>NTLM Relay Attack</li>
+                        </ul>
+                    </div>
+
+                    <div class="rule-category">
+                        <div class="category-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                <path d="M7 11V7a5 5 0 0110 0v4"/>
+                            </svg>
+                            <span>Persistence</span>
+                        </div>
+                        <ul class="rule-list">
+                            <li>Registry Persistence</li>
+                            <li>Scheduled Task Creation</li>
+                            <li>Service Installation</li>
+                            <li>DLL Sideloading</li>
+                        </ul>
+                    </div>
+
+                    <div class="rule-category">
+                        <div class="category-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20">
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                            </svg>
+                            <span>Network Threats</span>
+                        </div>
+                        <ul class="rule-list">
+                            <li>C2 Beaconing Detection</li>
+                            <li>DNS Tunneling</li>
+                            <li>Data Exfiltration</li>
+                            <li>DGA Detection</li>
+                        </ul>
+                    </div>
+
+                    <div class="rule-category">
+                        <div class="category-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                                <line x1="12" y1="9" x2="12" y2="13"/>
+                                <line x1="12" y1="17" x2="12.01" y2="17"/>
+                            </svg>
+                            <span>Web Attacks</span>
+                        </div>
+                        <ul class="rule-list">
+                            <li>SQL Injection</li>
+                            <li>XSS Attacks</li>
+                            <li>Path Traversal</li>
+                            <li>Webshell Detection</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="rule-example">
+                    <div class="rule-example-header">
+                        <span>Example: Suspicious PowerShell Execution</span>
+                        <span class="rule-file">suspicious_powershell_execution.yml</span>
+                    </div>
+                    <pre class="rule-code"><code><span class="key">title:</span> <span class="string">Suspicious PowerShell Execution</span>
+<span class="key">status:</span> <span class="string">experimental</span>
+<span class="key">logsource:</span>
+  <span class="key">product:</span> <span class="string">windows</span>
+  <span class="key">service:</span> <span class="string">powershell</span>
+<span class="key">detection:</span>
+  <span class="key">selection:</span>
+    <span class="key">CommandLine|contains:</span>
+      - <span class="string">'-encodedcommand'</span>
+      - <span class="string">'-enc'</span>
+      - <span class="string">'bypass'</span>
+      - <span class="string">'hidden'</span>
+  <span class="key">condition:</span> <span class="string">selection</span>
+<span class="key">level:</span> <span class="string">high</span>
+<span class="key">response:</span>
+  <span class="key">action:</span> <span class="string">kill_process</span>
+  <span class="key">requires_approval:</span> <span class="bool">true</span></code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta">
+        <div class="section-container">
+            <div class="cta-content">
+                <h2>Ready to Defend Your Infrastructure?</h2>
+                <p>Get started with ClawSec in minutes. Clone, configure, deploy.</p>
+                <div class="cta-actions">
+                    <a href="https://github.com/elhossam7/ClawSec" target="_blank" class="btn btn-primary btn-lg">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                        </svg>
+                        Star on GitHub
+                    </a>
+                    <div class="cta-code">
+                        <code>git clone https://github.com/elhossam7/ClawSec.git</code>
+                        <button class="copy-btn" onclick="navigator.clipboard.writeText('git clone https://github.com/elhossam7/ClawSec.git')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2"/>
+                                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <svg class="footer-logo" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18 2L4 9v9c0 8.3 5.9 16 14 18 8.1-2 14-9.7 14-18V9L18 2z"
+                          stroke="#00d4ff" stroke-width="1.5" fill="rgba(0,212,255,0.08)"/>
+                    <circle cx="18" cy="17" r="3" fill="#00d4ff"/>
+                </svg>
+                <span>ClawSec</span>
+            </div>
+            <div class="footer-links">
+                <a href="https://github.com/elhossam7/ClawSec" target="_blank">GitHub</a>
+                <a href="https://github.com/elhossam7/ClawSec/blob/main/README.md" target="_blank">Documentation</a>
+                <a href="https://github.com/elhossam7/ClawSec/issues" target="_blank">Issues</a>
+                <a href="https://github.com/elhossam7/ClawSec/blob/main/LICENSE" target="_blank">License</a>
+            </div>
+            <div class="footer-copy">
+                <p>Open Source Security Monitoring</p>
+                <p>&copy; 2026 ClawSec. MIT License.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Mobile navigation toggle
+        document.querySelector('.nav-toggle')?.addEventListener('click', function() {
+            document.querySelector('.nav-links').classList.toggle('active');
+            this.classList.toggle('active');
+        });
+
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // Navbar background on scroll
+        window.addEventListener('scroll', function() {
+            const navbar = document.querySelector('.navbar');
+            if (window.scrollY > 50) {
+                navbar.classList.add('scrolled');
+            } else {
+                navbar.classList.remove('scrolled');
+            }
+        });
+    </script>
+</body>
+</html>
+{{end}}

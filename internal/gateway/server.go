@@ -90,8 +90,12 @@ func (s *Server) Start(ctx context.Context) error {
 	// Static files.
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(filepath.Join("web", "static")))))
 
+	// Public landing page.
+	mux.HandleFunc("/landing", s.handleLanding)
+
 	// Pages (htmx).
-	mux.HandleFunc("/", s.requireAuth(s.handleDashboard))
+	mux.HandleFunc("/", s.handleRoot)
+	mux.HandleFunc("/dashboard", s.requireAuth(s.handleDashboard))
 	mux.HandleFunc("/login", s.handleLogin)
 	mux.HandleFunc("/logout", s.handleLogout)
 	mux.HandleFunc("/change-password", s.requireAuth(s.handleChangePassword))
@@ -165,11 +169,6 @@ func (s *Server) BroadcastEvent(eventType, data string) {
 // --- Page Handlers ---
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
-	}
-
 	session, _ := s.auth.getSessionFromRequest(r)
 
 	events, _ := s.store.GetRecentEvents(50)
@@ -206,10 +205,15 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleApprovalQueue(w http.ResponseWriter, r *http.Request) {
 	actions, _ := s.store.GetPendingActions()
 	recent, _ := s.store.GetRecentActions(20)
+	session, _ := s.auth.getSessionFromRequest(r)
 
 	data := map[string]interface{}{
-		"Pending": actions,
-		"Recent":  recent,
+		"Pending":   actions,
+		"Recent":    recent,
+		"CSRFToken": "",
+	}
+	if session != nil {
+		data["CSRFToken"] = session.CSRFToken
 	}
 
 	if r.Header.Get("HX-Request") == "true" {
@@ -384,7 +388,49 @@ func (s *Server) getAgentToolsList() []map[string]interface{} {
 	return result
 }
 
+// handleLanding serves the public landing page.
+func (s *Server) handleLanding(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+	s.templates.ExecuteTemplate(w, "landing", nil)
+}
+
+// handleRoot redirects to dashboard if authenticated, otherwise shows landing.
+func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
+	// Prevent caching of this response.
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Check if user is authenticated.
+	cookie, err := r.Cookie("session")
+	if err == nil {
+		_, valid := s.auth.ValidateSession(cookie.Value)
+		if valid {
+			// Authenticated user — redirect to dashboard.
+			http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+			return
+		}
+	}
+
+	// Not authenticated — show landing page.
+	s.templates.ExecuteTemplate(w, "landing", nil)
+}
+
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	// Prevent caching.
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+
+	// If already authenticated, redirect to dashboard.
+	if cookie, err := r.Cookie("session"); err == nil {
+		if _, valid := s.auth.ValidateSession(cookie.Value); valid {
+			http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+			return
+		}
+	}
+
 	if r.Method == "POST" {
 		username := r.FormValue("username")
 		password := r.FormValue("password")
@@ -415,7 +461,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 		return
 	}
 
@@ -472,15 +518,15 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		}
 
 		s.audit("password_changed", fmt.Sprintf("webui:%s", session.Username), "Password changed successfully")
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 		return
 	}
 
 	isDefault := s.auth.IsDefaultPassword(session.Username)
 	s.templates.ExecuteTemplate(w, "change-password", map[string]interface{}{
-		"CSRFToken":  session.CSRFToken,
-		"IsDefault":  isDefault,
-		"Username":   session.Username,
+		"CSRFToken": session.CSRFToken,
+		"IsDefault": isDefault,
+		"Username":  session.Username,
 	})
 }
 
