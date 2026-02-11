@@ -1,0 +1,38 @@
+id: log_clearing
+title: Security Log Clearing Detection
+description: Detects attempts to clear Windows event logs or Linux system logs using tools like wevtutil, Clear-EventLog, or direct log file removal. Log clearing is a defense evasion technique to cover attacker tracks.
+severity: critical
+status: active
+author: sentinel-ai
+tags:
+    - attack.defense_evasion
+    - attack.t1070.001
+    - log_clearing
+logsource:
+    category: system
+    product: ""
+    service: ""
+detection:
+    selection_wevtutil:
+        raw|re: "(?i)wevtutil\\s+(cl|clear-log)\\s+"
+    selection_powershell_clear:
+        raw|contains:
+            - "Clear-EventLog"
+            - "Remove-EventLog"
+            - "Limit-EventLog"
+    selection_event_id:
+        event_id:
+            - 1102
+            - 104
+    selection_linux_log_clear:
+        raw|re: "(?i)(rm|truncate|>\\s*/dev/null|shred)\\s+.*(syslog|auth\\.log|messages|secure|wtmp|btmp|lastlog)"
+    selection_journal_clear:
+        raw|contains:
+            - "journalctl --vacuum"
+            - "journalctl --rotate"
+    condition: selection_wevtutil or selection_powershell_clear or selection_event_id or selection_linux_log_clear or selection_journal_clear
+response:
+    - type: alert
+      target_field: username
+    - type: kill_process
+      target_field: pid

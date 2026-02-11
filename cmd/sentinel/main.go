@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -17,6 +18,7 @@ import (
 	"github.com/sentinel-agent/sentinel/internal/config"
 	"github.com/sentinel-agent/sentinel/internal/engine"
 	"github.com/sentinel-agent/sentinel/internal/gateway"
+	"github.com/sentinel-agent/sentinel/internal/logging"
 	"github.com/sentinel-agent/sentinel/internal/platform"
 	"github.com/sentinel-agent/sentinel/internal/response"
 	"github.com/sentinel-agent/sentinel/internal/skills"
@@ -48,6 +50,8 @@ func main() {
 		cmdRules()
 	case "validate-config":
 		cmdValidateConfig()
+	case "validate-rules":
+		cmdValidateRules()
 	case "test-llm":
 		cmdTestLLM()
 	case "help", "--help", "-h":
@@ -71,6 +75,7 @@ Commands:
   status            Show agent health and queue status
   rules             Manage detection rules (list, enable, disable)
   validate-config   Validate sentinel.yaml configuration
+  validate-rules    Validate detection rules against event schema
   test-llm          Test LLM provider connectivity
   version           Print version information
   help              Show this help
@@ -248,7 +253,17 @@ func cmdRun() {
 				aiAgent.RegisterTool(skills.NewEnableRuleSkill(eng, logger))
 				aiAgent.RegisterTool(skills.NewDisableRuleSkill(eng, logger))
 
-				logger.Info().Msg("AI agent initialized with 16 skills")
+				// Investigation skills.
+				aiAgent.RegisterTool(skills.NewDNSLookupSkill(logger))
+				aiAgent.RegisterTool(skills.NewNetstatSkill(logger))
+				aiAgent.RegisterTool(skills.NewWhoisSkill(logger))
+				aiAgent.RegisterTool(skills.NewFileIntegritySkill(logger))
+
+				// System info skills.
+				aiAgent.RegisterTool(skills.NewUserInfoSkill(logger))
+				aiAgent.RegisterTool(skills.NewServiceInfoSkill(logger))
+
+				logger.Info().Msg("AI agent initialized with 22 skills")
 
 				// Enable AI analysis routing in the detection engine.
 				if cfg.AI.AutoAnalyze {
@@ -382,6 +397,30 @@ func cmdRun() {
 			go tgBot.Start()
 			defer tgBot.Stop()
 		}
+	}
+
+	// Initialize Webhook alerter if configured.
+	if cfg.Webhook.Enabled {
+		webhookAlerter := alerting.NewWebhookAlerter(cfg.Webhook, logger)
+		orchestrator.OnAction(func(a types.ResponseAction) {
+			webhookAlerter.SendAlert(a)
+		})
+		orchestrator.OnExecute(func(a types.ResponseAction) {
+			webhookAlerter.SendExecutionNotice(a)
+		})
+		logger.Info().Str("url", cfg.Webhook.URL).Msg("webhook alerter initialized")
+	}
+
+	// Initialize Slack alerter if configured.
+	if cfg.Slack.Enabled {
+		slackAlerter := alerting.NewSlackAlerter(cfg.Slack, logger)
+		orchestrator.OnAction(func(a types.ResponseAction) {
+			slackAlerter.SendAlert(a)
+		})
+		orchestrator.OnExecute(func(a types.ResponseAction) {
+			slackAlerter.SendExecutionNotice(a)
+		})
+		logger.Info().Str("channel", cfg.Slack.Channel).Msg("slack alerter initialized")
 	}
 
 	// Start WebUI server.
@@ -536,12 +575,23 @@ func setupLogger(cfg config.LoggingConfig) zerolog.Logger {
 	}
 	zerolog.SetGlobalLevel(level)
 
-	// Set output.
+	// Determine output writer.
+	var output io.Writer = os.Stdout
+	if cfg.Output != "" && cfg.Output != "stdout" {
+		rw, err := logging.NewRotatingWriter(cfg.Output, 50, 5)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to open log file %s: %v (using stdout)\n", cfg.Output, err)
+		} else {
+			output = rw
+		}
+	}
+
+	// Set format.
 	if cfg.Format == "console" {
-		output := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}
-		logger = zerolog.New(output).With().Timestamp().Caller().Logger()
+		consoleWriter := zerolog.ConsoleWriter{Out: output, TimeFormat: time.RFC3339}
+		logger = zerolog.New(consoleWriter).With().Timestamp().Caller().Logger()
 	} else {
-		logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
+		logger = zerolog.New(output).With().Timestamp().Logger()
 	}
 
 	return logger
@@ -573,6 +623,47 @@ func cmdValidateConfig() {
 	} else {
 		fmt.Println("  AI:        disabled")
 	}
+}
+
+// cmdValidateRules validates all detection rules against the event schema.
+func cmdValidateRules() {
+	cfg, err := config.Load("sentinel.yaml")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
+		os.Exit(1)
+	}
+
+	rulesDir := cfg.Agent.RulesDir
+	if !filepath.IsAbs(rulesDir) {
+		rulesDir, _ = filepath.Abs(rulesDir)
+	}
+
+	schema := engine.NewSchema()
+	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+
+	issues, err := engine.ValidateAllRules(rulesDir, schema, logger)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	errors := 0
+	warnings := 0
+	for _, issue := range issues {
+		if issue.Level == "error" {
+			errors++
+			fmt.Printf("  ERROR   %-30s  %s: %s\n", issue.RuleID, issue.Field, issue.Message)
+		} else {
+			warnings++
+			fmt.Printf("  WARN    %-30s  %s: %s\n", issue.RuleID, issue.Field, issue.Message)
+		}
+	}
+
+	fmt.Printf("\nValidation complete: %d errors, %d warnings\n", errors, warnings)
+	if errors > 0 {
+		os.Exit(1)
+	}
+	fmt.Println("All rules valid.")
 }
 
 // cmdTestLLM verifies the configured LLM provider is reachable.

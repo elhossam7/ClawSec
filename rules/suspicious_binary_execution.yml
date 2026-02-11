@@ -1,0 +1,51 @@
+id: suspicious_binary_execution
+title: Binary Execution from Suspicious Path
+description: Detects execution of binaries from world-writable or unusual directories such as /tmp, /dev/shm, /var/tmp, and user Downloads folders. Legitimate software rarely executes from these locations, making this a strong indicator of malicious activity.
+severity: medium
+status: active
+author: sentinel-ai
+tags:
+    - attack.execution
+    - attack.defense_evasion
+    - attack.t1036
+    - attack.t1059
+    - suspicious_path
+logsource:
+    category: process_creation
+    product: ""
+    service: ""
+detection:
+    selection_tmp_exec:
+        raw|re: "(?i)(^|\\s)(/tmp/|/var/tmp/|/dev/shm/)\\S+"
+    selection_downloads_exec:
+        raw|contains:
+            - "/Downloads/"
+            - "\\Downloads\\"
+            - "/Temp/"
+            - "\\Temp\\"
+    selection_process_name:
+        process_name|startswith:
+            - "/tmp/"
+            - "/dev/shm/"
+            - "/var/tmp/"
+    selection_command_line:
+        command_line|contains:
+            - "/tmp/"
+            - "/dev/shm/"
+            - "/var/tmp/"
+            - "\\AppData\\Local\\Temp\\"
+            - "\\Downloads\\"
+    selection_hidden_exec:
+        raw|re: "(?i)(/tmp/\\.|/dev/shm/\\.|/var/tmp/\\.)\\S+"
+    condition: selection_tmp_exec or selection_downloads_exec or selection_process_name or selection_command_line or selection_hidden_exec
+correlation:
+    group_by:
+        - username
+        - source_ip
+    threshold: 3
+    window: 15m
+response:
+    - type: kill_process
+      target_field: pid
+    - type: alert
+      target_field: username

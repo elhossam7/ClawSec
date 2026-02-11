@@ -17,6 +17,7 @@ import (
 	"github.com/sentinel-agent/sentinel/internal/agent"
 	"github.com/sentinel-agent/sentinel/internal/config"
 	"github.com/sentinel-agent/sentinel/internal/engine"
+	"github.com/sentinel-agent/sentinel/internal/logging"
 	"github.com/sentinel-agent/sentinel/internal/response"
 	"github.com/sentinel-agent/sentinel/internal/storage"
 	"github.com/sentinel-agent/sentinel/internal/types"
@@ -29,9 +30,11 @@ type Server struct {
 	eng          *engine.Engine
 	orchestrator *response.Orchestrator
 	agent        *agent.Agent
+	auth         *AuthManager
 	templates    *template.Template
 	sseClients   map[chan string]bool
 	sseMu        sync.Mutex
+	reqIDGen     *logging.RequestIDGenerator
 	logger       zerolog.Logger
 	startTime    time.Time
 	httpServer   *http.Server
@@ -39,12 +42,24 @@ type Server struct {
 
 // NewServer creates a new gateway server.
 func NewServer(cfg config.WebConfig, store *storage.SQLite, eng *engine.Engine, orch *response.Orchestrator, logger zerolog.Logger) *Server {
+	authMgr := NewAuthManager(store.DB())
+
+	// Ensure default admin exists on first run.
+	created, err := authMgr.EnsureDefaultAdmin()
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to ensure default admin user")
+	} else if created {
+		logger.Warn().Msg("created default admin user (admin/sentinel) — change password immediately")
+	}
+
 	return &Server{
 		cfg:          cfg,
 		store:        store,
 		eng:          eng,
 		orchestrator: orch,
+		auth:         authMgr,
 		sseClients:   make(map[chan string]bool),
+		reqIDGen:     logging.NewRequestIDGenerator(),
 		logger:       logger.With().Str("component", "gateway").Logger(),
 		startTime:    time.Now(),
 	}
@@ -78,6 +93,8 @@ func (s *Server) Start(ctx context.Context) error {
 	// Pages (htmx).
 	mux.HandleFunc("/", s.requireAuth(s.handleDashboard))
 	mux.HandleFunc("/login", s.handleLogin)
+	mux.HandleFunc("/logout", s.handleLogout)
+	mux.HandleFunc("/change-password", s.requireAuth(s.handleChangePassword))
 	mux.HandleFunc("/approval", s.requireAuth(s.handleApprovalQueue))
 	mux.HandleFunc("/rules", s.requireAuth(s.handleRules))
 	mux.HandleFunc("/incidents", s.requireAuth(s.handleIncidents))
@@ -103,6 +120,9 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// Server-Sent Events for real-time updates.
 	mux.HandleFunc("/api/events/stream", s.requireAuth(s.handleSSE))
+
+	// REST API v1 for external integrations.
+	s.RegisterAPIRoutes(mux)
 
 	s.httpServer = &http.Server{
 		Addr:         s.cfg.ListenAddr,
@@ -150,6 +170,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	session, _ := s.auth.getSessionFromRequest(r)
+
 	events, _ := s.store.GetRecentEvents(50)
 	incidents, _ := s.store.GetOpenIncidents()
 	pending, _ := s.store.GetPendingActions()
@@ -162,6 +184,10 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"EventCount":     eventCount,
 		"ActiveRules":    s.eng.RuleCount(),
 		"Uptime":         time.Since(s.startTime).Round(time.Second),
+		"CSRFToken":      "",
+	}
+	if session != nil {
+		data["CSRFToken"] = session.CSRFToken
 	}
 
 	// If htmx partial request, render just the content.
@@ -360,36 +386,114 @@ func (s *Server) getAgentToolsList() []map[string]interface{} {
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
-		// Basic login - in production use bcrypt + TOTP.
 		username := r.FormValue("username")
 		password := r.FormValue("password")
 
-		// Default admin credentials (should be changed on first run).
-		if username == "admin" && password == "sentinel" {
-			http.SetCookie(w, &http.Cookie{
-				Name:     "session",
-				Value:    "authenticated", // Simplified - use proper session tokens
-				Path:     "/",
-				HttpOnly: true,
-				Secure:   s.cfg.TLSCert != "",
-				MaxAge:   3600 * 8,
+		session, err := s.auth.Authenticate(username, password, r.RemoteAddr)
+		if err != nil {
+			s.audit("login_failed", fmt.Sprintf("webui:%s", username), fmt.Sprintf("Failed login attempt from %s: %v", r.RemoteAddr, err))
+			s.templates.ExecuteTemplate(w, "login", map[string]interface{}{
+				"Error": "Invalid credentials",
 			})
-			s.audit("login_success", fmt.Sprintf("webui:%s", username), fmt.Sprintf("Successful login from %s", r.RemoteAddr))
-			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
 
-		s.audit("login_failed", fmt.Sprintf("webui:%s", username), fmt.Sprintf("Failed login attempt from %s", r.RemoteAddr))
-		s.templates.ExecuteTemplate(w, "login", map[string]interface{}{
-			"Error": "Invalid credentials",
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session",
+			Value:    session.Token,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   s.cfg.TLSCert != "",
+			SameSite: http.SameSiteStrictMode,
+			MaxAge:   int(s.auth.sessionTTL.Seconds()),
 		})
+		s.audit("login_success", fmt.Sprintf("webui:%s", username), fmt.Sprintf("Successful login from %s", r.RemoteAddr))
+
+		// Redirect to password change if default password.
+		if s.auth.IsDefaultPassword(username) {
+			http.Redirect(w, r, "/change-password", http.StatusSeeOther)
+			return
+		}
+
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 
 	s.templates.ExecuteTemplate(w, "login", nil)
 }
 
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("session")
+	if err == nil {
+		s.auth.DestroySession(cookie.Value)
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   -1,
+	})
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
+func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
+	session, _ := s.auth.getSessionFromRequest(r)
+	if session == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	if r.Method == "POST" {
+		// Validate CSRF token.
+		if !s.auth.ValidateCSRF(session.Token, r.FormValue("csrf_token")) {
+			http.Error(w, "Invalid CSRF token", http.StatusForbidden)
+			return
+		}
+
+		newPassword := r.FormValue("new_password")
+		confirmPassword := r.FormValue("confirm_password")
+
+		if newPassword != confirmPassword {
+			s.templates.ExecuteTemplate(w, "change-password", map[string]interface{}{
+				"Error":     "Passwords do not match",
+				"CSRFToken": session.CSRFToken,
+			})
+			return
+		}
+
+		if err := s.auth.ChangePassword(session.Username, newPassword); err != nil {
+			s.templates.ExecuteTemplate(w, "change-password", map[string]interface{}{
+				"Error":     err.Error(),
+				"CSRFToken": session.CSRFToken,
+			})
+			return
+		}
+
+		s.audit("password_changed", fmt.Sprintf("webui:%s", session.Username), "Password changed successfully")
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	isDefault := s.auth.IsDefaultPassword(session.Username)
+	s.templates.ExecuteTemplate(w, "change-password", map[string]interface{}{
+		"CSRFToken":  session.CSRFToken,
+		"IsDefault":  isDefault,
+		"Username":   session.Username,
+	})
+}
+
 // --- Audit Helpers ---
+
+// getActor returns the "webui:<username>" actor string from the request session.
+func (s *Server) getActor(r *http.Request) string {
+	session, _ := s.auth.getSessionFromRequest(r)
+	if session != nil {
+		return fmt.Sprintf("webui:%s", session.Username)
+	}
+	return "webui:unknown"
+}
 
 func (s *Server) audit(action, actor, details string) {
 	entry := &types.AuditEntry{
@@ -412,13 +516,14 @@ func (s *Server) handleAPIApprove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	actor := s.getActor(r)
 	actionID := r.URL.Path[len("/api/approve/"):]
-	if err := s.orchestrator.Approve(actionID, "webui:admin"); err != nil {
+	if err := s.orchestrator.Approve(actionID, actor); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	s.audit("action_approved", "webui:admin", fmt.Sprintf("Approved and executed action %s", actionID))
+	s.audit("action_approved", actor, fmt.Sprintf("Approved and executed action %s", actionID))
 	s.BroadcastEvent("action_executed", actionID)
 
 	// Return updated approval queue for htmx swap.
@@ -431,13 +536,14 @@ func (s *Server) handleAPIDeny(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	actor := s.getActor(r)
 	actionID := r.URL.Path[len("/api/deny/"):]
-	if err := s.orchestrator.Deny(actionID, "webui:admin"); err != nil {
+	if err := s.orchestrator.Deny(actionID, actor); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	s.audit("action_denied", "webui:admin", fmt.Sprintf("Denied action %s", actionID))
+	s.audit("action_denied", actor, fmt.Sprintf("Denied action %s", actionID))
 	s.handleApprovalQueue(w, r)
 }
 
@@ -447,13 +553,14 @@ func (s *Server) handleAPIRollback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	actor := s.getActor(r)
 	actionID := r.URL.Path[len("/api/rollback/"):]
 	if err := s.orchestrator.Rollback(actionID); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	s.audit("action_rolledback", "webui:admin", fmt.Sprintf("Rolled back action %s", actionID))
+	s.audit("action_rolledback", actor, fmt.Sprintf("Rolled back action %s", actionID))
 	s.BroadcastEvent("action_rolledback", actionID)
 	s.handleApprovalQueue(w, r)
 }
@@ -464,6 +571,7 @@ func (s *Server) handleAPIRuleToggle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	actor := s.getActor(r)
 	ruleID := r.URL.Path[len("/api/rules/toggle/"):]
 	action := r.FormValue("action")
 
@@ -479,7 +587,7 @@ func (s *Server) handleAPIRuleToggle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.audit("rule_"+action+"d", "webui:admin", fmt.Sprintf("Rule %s %sd", ruleID, action))
+	s.audit("rule_"+action+"d", actor, fmt.Sprintf("Rule %s %sd", ruleID, action))
 	s.handleRules(w, r)
 }
 
@@ -560,19 +668,52 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		next.ServeHTTP(w, r)
+		reqID := s.reqIDGen.Next()
+
+		// Set request ID on response header for tracing.
+		w.Header().Set("X-Request-ID", reqID)
+
+		// Wrap response writer to capture status code.
+		wrapped := &statusWriter{ResponseWriter: w, status: 200}
+
+		next.ServeHTTP(wrapped, r)
+
 		s.logger.Debug().
+			Str("request_id", reqID).
 			Str("method", r.Method).
 			Str("path", r.URL.Path).
+			Int("status", wrapped.status).
 			Dur("duration", time.Since(start)).
+			Str("remote", r.RemoteAddr).
 			Msg("request")
 	})
 }
 
+// statusWriter wraps http.ResponseWriter to capture the status code.
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+	wrote  bool
+}
+
+func (sw *statusWriter) WriteHeader(code int) {
+	if !sw.wrote {
+		sw.status = code
+		sw.wrote = true
+	}
+	sw.ResponseWriter.WriteHeader(code)
+}
+
+func (sw *statusWriter) Flush() {
+	if f, ok := sw.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
 func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie("session")
-		if err != nil || cookie.Value != "authenticated" {
+		session, valid := s.auth.getSessionFromRequest(r)
+		if !valid || session == nil {
 			if r.Header.Get("HX-Request") == "true" {
 				w.Header().Set("HX-Redirect", "/login")
 				w.WriteHeader(http.StatusUnauthorized)
@@ -581,6 +722,19 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
+
+		// Validate CSRF token on state-changing requests.
+		if r.Method == "POST" || r.Method == "PUT" || r.Method == "DELETE" {
+			csrfToken := r.FormValue("csrf_token")
+			if csrfToken == "" {
+				csrfToken = r.Header.Get("X-CSRF-Token")
+			}
+			if !s.auth.ValidateCSRF(session.Token, csrfToken) {
+				http.Error(w, "Invalid CSRF token", http.StatusForbidden)
+				return
+			}
+		}
+
 		next(w, r)
 	}
 }

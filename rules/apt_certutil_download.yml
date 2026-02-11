@@ -1,0 +1,19 @@
+id: apt_certutil_download
+title: Suspicious File Download via CertUtil
+description: Detects use of certutil.exe to download remote files, a known living-off-the-land technique.
+severity: high
+status: active
+author: sentinel-ai
+tags:
+  - attack.command_and_control
+  - attack.t1105
+logsource:
+    category: system
+    product: ""
+    service: ""
+detection:
+    selection:
+        raw|contains:
+            - certutil
+            - urlcache
+    condition: selection

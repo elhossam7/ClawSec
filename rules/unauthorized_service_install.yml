@@ -1,0 +1,41 @@
+id: unauthorized_service_install
+title: Unauthorized Service Installation Detection
+description: Detects installation of new services through sc.exe, New-Service PowerShell cmdlet, or systemd unit file creation. Attackers install malicious services to achieve persistence and privilege escalation on compromised hosts.
+severity: high
+status: active
+author: sentinel-ai
+tags:
+    - attack.persistence
+    - attack.privilege_escalation
+    - attack.t1543.003
+    - attack.t1543.002
+    - service_install
+logsource:
+    category: system
+    product: ""
+    service: ""
+detection:
+    selection_sc_create:
+        raw|re: "(?i)sc\\s+(create|config)\\s+.*\\s+binpath="
+    selection_powershell_service:
+        raw|contains:
+            - "New-Service"
+            - "Set-Service"
+    selection_event_id:
+        event_id:
+            - 7045
+            - 4697
+    selection_systemd_install:
+        raw|re: "(?i)(cp|mv|ln|cat|echo|tee)\\s+.*/etc/systemd/system/.*\\.service"
+    selection_suspicious_binpath:
+        raw|re: "(?i)binpath=.*(cmd|powershell|mshta|regsvr32|rundll32|temp|tmp|appdata)"
+    selection_process:
+        process_name|contains:
+            - "sc.exe"
+            - "services.exe"
+    condition: (selection_sc_create or selection_powershell_service or selection_event_id or selection_systemd_install) and (selection_suspicious_binpath or selection_process)
+response:
+    - type: alert
+      target_field: username
+    - type: kill_process
+      target_field: pid

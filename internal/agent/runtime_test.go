@@ -33,7 +33,9 @@ func (m *mockLLMClient) Complete(ctx context.Context, messages []Message, tools 
 	}, nil
 }
 
-func (m *mockLLMClient) Provider() string { return "mock" }
+func (m *mockLLMClient) Provider() string   { return "mock" }
+func (m *mockLLMClient) GetModel() string    { return "mock-model" }
+func (m *mockLLMClient) SetModel(model string) {}
 
 // ---------------------------------------------------------------------------
 // Mock Memory
@@ -295,7 +297,9 @@ func (m *multiTurnMock) Complete(ctx context.Context, messages []Message, tools 
 	return resp, nil
 }
 
-func (m *multiTurnMock) Provider() string { return "mock_multi" }
+func (m *multiTurnMock) Provider() string   { return "mock_multi" }
+func (m *multiTurnMock) GetModel() string    { return "mock-multi-model" }
+func (m *multiTurnMock) SetModel(model string) {}
 
 func TestChat_ValidInput(t *testing.T) {
 	mockLLM := &mockLLMClient{response: "There are no recent incidents for that IP."}

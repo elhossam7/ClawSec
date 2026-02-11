@@ -3,12 +3,16 @@ package response
 import (
 	"context"
 	"fmt"
+	"net"
 	"os/exec"
+	"regexp"
 	"runtime"
 	"strings"
 
 	"github.com/rs/zerolog"
 )
+
+var validUsername = regexp.MustCompile(`^[a-zA-Z0-9._\-]+$`)
 
 // PlatformExecutor implements Executor for the current platform.
 type PlatformExecutor struct {
@@ -28,8 +32,13 @@ func (pe *PlatformExecutor) BlockIP(ctx context.Context, ip string) (string, err
 		return "", fmt.Errorf("empty IP address")
 	}
 
-	// Validate IP format (basic check).
-	if strings.ContainsAny(ip, ";|&$`") {
+	// Strict IP validation using net.ParseIP.
+	if net.ParseIP(ip) == nil {
+		return "", fmt.Errorf("invalid IP address: %s", ip)
+	}
+
+	// Defense-in-depth: reject any shell metacharacters.
+	if strings.ContainsAny(ip, ";|&$`\"'(){}[]\\!><") {
 		return "", fmt.Errorf("invalid characters in IP: %s", ip)
 	}
 
@@ -45,6 +54,9 @@ func (pe *PlatformExecutor) BlockIP(ctx context.Context, ip string) (string, err
 
 // UnblockIP removes the IP block.
 func (pe *PlatformExecutor) UnblockIP(ctx context.Context, ip string) error {
+	if net.ParseIP(ip) == nil {
+		return fmt.Errorf("invalid IP address: %s", ip)
+	}
 	switch runtime.GOOS {
 	case "linux":
 		return pe.unblockIPLinux(ctx, ip)
@@ -60,7 +72,12 @@ func (pe *PlatformExecutor) DisableUser(ctx context.Context, username string) (s
 	if username == "" {
 		return "", fmt.Errorf("empty username")
 	}
-	if strings.ContainsAny(username, ";|&$`") {
+	// Strict username validation: alphanumeric, dots, underscores, hyphens only.
+	if !validUsername.MatchString(username) {
+		return "", fmt.Errorf("invalid username format: %s", username)
+	}
+	// Defense-in-depth: reject shell metacharacters including quotes.
+	if strings.ContainsAny(username, ";|&$`\"'(){}[]\\!><") {
 		return "", fmt.Errorf("invalid characters in username: %s", username)
 	}
 
@@ -76,6 +93,9 @@ func (pe *PlatformExecutor) DisableUser(ctx context.Context, username string) (s
 
 // EnableUser unlocks a user account.
 func (pe *PlatformExecutor) EnableUser(ctx context.Context, username string) error {
+	if !validUsername.MatchString(username) {
+		return fmt.Errorf("invalid username format: %s", username)
+	}
 	switch runtime.GOOS {
 	case "linux":
 		return pe.enableUserLinux(ctx, username)
@@ -86,10 +106,19 @@ func (pe *PlatformExecutor) EnableUser(ctx context.Context, username string) err
 	}
 }
 
+// validPID matches numeric PIDs only.
+var validPID = regexp.MustCompile(`^[0-9]+$`)
+
+// validContainerID matches Docker container IDs (hex, 12-64 chars) or short names.
+var validContainerID = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.\-]{0,127}$`)
+
 // KillProcess terminates a process by PID.
 func (pe *PlatformExecutor) KillProcess(ctx context.Context, pid string) error {
 	if pid == "" {
 		return fmt.Errorf("empty PID")
+	}
+	if !validPID.MatchString(pid) {
+		return fmt.Errorf("invalid PID format: %s", pid)
 	}
 
 	switch runtime.GOOS {
@@ -108,6 +137,9 @@ func (pe *PlatformExecutor) KillProcess(ctx context.Context, pid string) error {
 func (pe *PlatformExecutor) IsolateContainer(ctx context.Context, containerID string) (string, error) {
 	if containerID == "" {
 		return "", fmt.Errorf("empty container ID")
+	}
+	if !validContainerID.MatchString(containerID) {
+		return "", fmt.Errorf("invalid container ID format: %s", containerID)
 	}
 
 	// Get current networks.

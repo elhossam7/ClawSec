@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 	"strings"
 	"time"
 
@@ -322,6 +323,9 @@ func (a *Agent) Chat(ctx context.Context, query, sessionID string) (string, []ty
 	}
 	messages = append(messages, Message{Role: "user", Content: query})
 
+	// Prune conversation history if it's getting too long.
+	messages = pruneConversation(messages, 80000)
+
 	var allToolCalls []types.ToolCall
 	iterations := 0
 	maxIter := a.cfg.MaxToolCalls
@@ -382,6 +386,62 @@ func (a *Agent) Chat(ctx context.Context, query, sessionID string) (string, []ty
 	return resp.Content, allToolCalls, nil
 }
 
+// pruneConversation trims conversation history to stay within token limits.
+// It preserves the system message (first) and the most recent user message (last),
+// and removes older messages from the middle when the estimated token count
+// exceeds the threshold (approximately 80% of context window).
+func pruneConversation(messages []Message, maxTokens int) []Message {
+	total := estimateTokens(messages)
+	if total <= maxTokens {
+		return messages
+	}
+
+	// Keep system message and last user message.
+	if len(messages) <= 2 {
+		return messages
+	}
+
+	// Remove messages from the middle (oldest first after system).
+	pruned := []Message{messages[0]} // system
+	middle := messages[1 : len(messages)-1]
+	last := messages[len(messages)-1]
+
+	// If middle is very long, summarize by keeping only the last N messages.
+	for total > maxTokens && len(middle) > 0 {
+		total -= estimateMessageTokens(middle[0])
+		middle = middle[1:]
+	}
+
+	// Add a summarization note if we pruned.
+	if len(middle) < len(messages)-2 {
+		pruned = append(pruned, Message{
+			Role:    "system",
+			Content: "[Earlier conversation messages were pruned to stay within context limits.]",
+		})
+	}
+
+	pruned = append(pruned, middle...)
+	pruned = append(pruned, last)
+	return pruned
+}
+
+// estimateTokens provides a rough token count (1 token ~ 4 chars for English).
+func estimateTokens(messages []Message) int {
+	total := 0
+	for _, m := range messages {
+		total += estimateMessageTokens(m)
+	}
+	return total
+}
+
+func estimateMessageTokens(m Message) int {
+	count := len(m.Content) / 4
+	for _, tc := range m.ToolCalls {
+		count += len(tc.RawInput) / 4
+	}
+	return count + 4 // overhead per message
+}
+
 // getToolDefs returns tool definitions in LLM-friendly format.
 func (a *Agent) getToolDefs() []ToolDef {
 	var defs []ToolDef
@@ -430,6 +490,9 @@ func (a *Agent) executeTool(ctx context.Context, tc LLMTool) *types.ToolResult {
 
 	a.logger.Info().Str("tool", tc.Name).Bool("success", result.Success).Msg("tool executed")
 
+	// Sanitize tool output before returning to LLM.
+	result = sanitizeToolOutput(result)
+
 	// Audit the tool execution.
 	if a.store != nil {
 		paramsJSON, _ := json.Marshal(params)
@@ -457,7 +520,9 @@ func (a *Agent) parseAnalysis(content string, incidentID string, toolCalls []typ
 		RiskScore:  5,
 	}
 
-	// Try to parse the JSON response.
+	// Try to parse JSON, with markdown fence stripping.
+	jsonStr := extractJSON(content)
+
 	var parsed struct {
 		Observation    string `json:"observation"`
 		Analysis       string `json:"analysis"`
@@ -476,7 +541,7 @@ func (a *Agent) parseAnalysis(content string, incidentID string, toolCalls []typ
 		RequiresHuman bool `json:"requires_human"`
 	}
 
-	if err := json.Unmarshal([]byte(content), &parsed); err == nil {
+	if err := json.Unmarshal([]byte(jsonStr), &parsed); err == nil {
 		result.Summary = parsed.Observation
 		result.Reasoning = parsed.Analysis
 		result.Confidence = parsed.Recommendation.Confidence
@@ -503,12 +568,61 @@ func (a *Agent) parseAnalysis(content string, incidentID string, toolCalls []typ
 			result.ProposedActions = append(result.ProposedActions, proposal)
 		}
 	} else {
-		// Fallback: treat entire content as summary.
+		// Regex fallback: extract key fields from natural language.
 		result.Summary = content
 		result.Reasoning = content
+		result.Confidence = extractConfidence(content)
+		result.RiskScore = extractRiskScore(content)
 	}
 
 	return result
+}
+
+// extractJSON strips markdown fences and extracts the first JSON object from content.
+func extractJSON(content string) string {
+	// Strip markdown code fences (```json ... ``` or ``` ... ```).
+	fenceRe := regexp.MustCompile("(?s)```(?:json)?\\s*\\n?(.*?)\\n?```")
+	if matches := fenceRe.FindStringSubmatch(content); len(matches) > 1 {
+		content = matches[1]
+	}
+
+	// Find the first { and last } to extract JSON object.
+	start := strings.Index(content, "{")
+	end := strings.LastIndex(content, "}")
+	if start >= 0 && end > start {
+		return content[start : end+1]
+	}
+
+	return content
+}
+
+// extractConfidence attempts to pull a confidence value from natural text.
+func extractConfidence(content string) float64 {
+	re := regexp.MustCompile(`(?i)confidence[:\s]+(\d+(?:\.\d+)?)\s*%?`)
+	if matches := re.FindStringSubmatch(content); len(matches) > 1 {
+		var val float64
+		if _, err := fmt.Sscanf(matches[1], "%f", &val); err == nil {
+			if val > 1 {
+				val /= 100
+			}
+			return val
+		}
+	}
+	return 0.5
+}
+
+// extractRiskScore attempts to pull a risk score from natural text.
+func extractRiskScore(content string) int {
+	re := regexp.MustCompile(`(?i)risk[_\s]*score[:\s]+(\d+)`)
+	if matches := re.FindStringSubmatch(content); len(matches) > 1 {
+		var val int
+		if _, err := fmt.Sscanf(matches[1], "%d", &val); err == nil {
+			if val >= 1 && val <= 10 {
+				return val
+			}
+		}
+	}
+	return 5
 }
 
 // auditAnalysis persists the analysis for compliance.
@@ -543,4 +657,77 @@ func rawToMap(raw json.RawMessage) map[string]interface{} {
 	m := make(map[string]interface{})
 	json.Unmarshal(raw, &m)
 	return m
+}
+
+// ---------------------------------------------------------------------------
+// Tool Output Sanitization (Tier 2.2)
+// ---------------------------------------------------------------------------
+
+const (
+	maxToolOutputLen = 16000  // ~4000 tokens — keeps context window manageable.
+	maxErrorLen      = 500    // Errors don't need to be long.
+)
+
+// sanitizeToolOutput truncates oversized output, strips prompt-injection
+// patterns, and wraps data in delimiters so the LLM treats it as data.
+func sanitizeToolOutput(result *types.ToolResult) *types.ToolResult {
+	if result == nil {
+		return result
+	}
+
+	out := *result // shallow copy — we never modify Data map in-place
+
+	// 1. Truncate output.
+	if len(out.Output) > maxToolOutputLen {
+		out.Output = out.Output[:maxToolOutputLen] + "\n... [output truncated]"
+	}
+
+	// 2. Truncate error.
+	if len(out.Error) > maxErrorLen {
+		out.Error = out.Error[:maxErrorLen] + "... [truncated]"
+	}
+
+	// 3. Strip prompt-injection patterns from output.
+	out.Output = stripInjectionPatterns(out.Output)
+
+	// 4. Wrap in data delimiters so the LLM knows this is tool data.
+	if out.Output != "" {
+		out.Output = "<tool-data>\n" + out.Output + "\n</tool-data>"
+	}
+
+	return &out
+}
+
+// stripInjectionPatterns removes common prompt-injection sequences from tool
+// output. These patterns attempt to override the system prompt or trick the
+// model into ignoring instructions.
+func stripInjectionPatterns(s string) string {
+	// Patterns that try to override system instructions.
+	injectionPatterns := []string{
+		"ignore previous instructions",
+		"ignore all previous",
+		"disregard your instructions",
+		"forget your instructions",
+		"you are now",
+		"new instructions:",
+		"system prompt:",
+		"<|im_start|>",
+		"<|im_end|>",
+		"[INST]",
+		"[/INST]",
+		"<<SYS>>",
+		"<</SYS>>",
+	}
+
+	lower := strings.ToLower(s)
+	for _, pattern := range injectionPatterns {
+		if idx := strings.Index(lower, pattern); idx >= 0 {
+			// Replace the injection pattern with a redaction marker.
+			end := idx + len(pattern)
+			s = s[:idx] + "[REDACTED:injection]" + s[end:]
+			lower = strings.ToLower(s)
+		}
+	}
+
+	return s
 }

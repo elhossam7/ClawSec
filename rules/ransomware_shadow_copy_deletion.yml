@@ -1,0 +1,20 @@
+id: ransomware_shadow_copy_deletion
+title: Inhibit System Recovery via VSSAdmin
+description: Detects attempts to delete system backups using vssadmin, a common ransomware technique.
+severity: critical
+status: active
+author: sentinel-ai
+tags:
+  - attack.impact
+  - attack.t1490
+logsource:
+    category: system
+    product: ""
+    service: ""
+detection:
+    selection:
+        raw|re: (?i)vssadmin.*(delete|resize).*shadow
+    condition: selection
+response:
+    - type: kill_process
+      target_field: pid

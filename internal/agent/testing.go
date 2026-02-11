@@ -29,6 +29,12 @@ type MockLLM struct {
 // Provider implements LLMClient.
 func (m *MockLLM) Provider() string { return "mock" }
 
+// GetModel implements LLMClient.
+func (m *MockLLM) GetModel() string { return "mock-model" }
+
+// SetModel implements LLMClient.
+func (m *MockLLM) SetModel(_ string) {}
+
 // Complete implements LLMClient.
 // It captures the system and last user message, then returns a simple
 // end-turn response whose Content is m.Response.

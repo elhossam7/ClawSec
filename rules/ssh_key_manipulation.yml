@@ -1,0 +1,39 @@
+id: ssh_key_manipulation
+title: SSH Authorized Keys Manipulation
+description: Detects unauthorized modifications to SSH authorized_keys files, which attackers use to plant persistent backdoor access. Monitors for key additions, file permission changes, and suspicious key-related operations.
+severity: high
+status: active
+author: sentinel-ai
+tags:
+    - attack.persistence
+    - attack.lateral_movement
+    - attack.t1098.004
+    - ssh
+    - authorized_keys
+logsource:
+    category: system
+    product: linux
+    service: ""
+detection:
+    selection_authorized_keys_write:
+        raw|re: "(?i)(echo|cat|tee|cp|mv|>>)\\s+.*authorized_keys"
+    selection_ssh_dir_access:
+        raw|contains:
+            - ".ssh/authorized_keys"
+            - ".ssh/authorized_keys2"
+            - ".ssh/id_rsa"
+    selection_ssh_keygen:
+        raw|re: "(?i)ssh-keygen\\s+.*(-f|>>)"
+    selection_curl_key_inject:
+        raw|re: "(?i)(curl|wget).*>>.*authorized_keys"
+    selection_chmod_ssh:
+        raw|re: "(?i)chmod\\s+.*/\\.ssh"
+    selection_command_line:
+        command_line|contains:
+            - "authorized_keys"
+            - "id_rsa"
+            - "ssh-keygen"
+    condition: selection_authorized_keys_write or selection_curl_key_inject or (selection_ssh_dir_access and (selection_ssh_keygen or selection_chmod_ssh or selection_command_line))
+response:
+    - type: alert
+      target_field: username

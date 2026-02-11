@@ -8,23 +8,24 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sentinel-agent/sentinel/internal/platform"
 	"github.com/sentinel-agent/sentinel/internal/types"
 	"gopkg.in/yaml.v3"
 )
 
 // Rule represents a SIGMA-compatible detection rule with Sentinel extensions.
 type Rule struct {
-	ID          string            `yaml:"id"`
-	Title       string            `yaml:"title"`
-	Description string            `yaml:"description"`
-	Severity    string            `yaml:"severity"`
-	Status      string            `yaml:"status"` // "active", "test", "disabled"
-	Author      string            `yaml:"author"`
-	Tags        []string          `yaml:"tags"`
-	LogSource   RuleLogSource     `yaml:"logsource"`
-	Detection   RuleDetection     `yaml:"detection"`
-	Correlation *RuleCorrelation  `yaml:"correlation,omitempty"`
-	Response    []RuleAction      `yaml:"response,omitempty"` // Sentinel extension
+	ID          string           `yaml:"id"`
+	Title       string           `yaml:"title"`
+	Description string           `yaml:"description"`
+	Severity    string           `yaml:"severity"`
+	Status      string           `yaml:"status"` // "active", "test", "disabled"
+	Author      string           `yaml:"author"`
+	Tags        []string         `yaml:"tags"`
+	LogSource   RuleLogSource    `yaml:"logsource"`
+	Detection   RuleDetection    `yaml:"detection"`
+	Correlation *RuleCorrelation `yaml:"correlation,omitempty"`
+	Response    []RuleAction     `yaml:"response,omitempty"` // Sentinel extension
 }
 
 // RuleLogSource filters which events should be evaluated against this rule.
@@ -36,22 +37,22 @@ type RuleLogSource struct {
 
 // RuleDetection defines the matching logic.
 type RuleDetection struct {
-	Selection map[string]interface{} `yaml:"selection"` // Field conditions
+	Selection map[string]interface{} `yaml:"selection"`        // Field conditions
 	Filter    map[string]interface{} `yaml:"filter,omitempty"` // Exclusions
-	Condition string                  `yaml:"condition"` // "selection", "selection and not filter"
+	Condition string                 `yaml:"condition"`        // "selection", "selection and not filter"
 }
 
 // RuleCorrelation enables threshold/window-based detection.
 type RuleCorrelation struct {
-	GroupBy   []string      `yaml:"group_by"`   // Fields to group by
-	Threshold int           `yaml:"threshold"`   // Min events to trigger
-	Window    time.Duration `yaml:"window"`      // Time window
+	GroupBy   []string      `yaml:"group_by"`  // Fields to group by
+	Threshold int           `yaml:"threshold"` // Min events to trigger
+	Window    time.Duration `yaml:"window"`    // Time window
 }
 
 // RuleAction defines a response action associated with a rule.
 type RuleAction struct {
-	Type       types.ActionType `yaml:"type"`
-	TargetField string          `yaml:"target_field"` // Event field to use as target
+	Type        types.ActionType `yaml:"type"`
+	TargetField string           `yaml:"target_field"` // Event field to use as target
 }
 
 // CompiledRule is a pre-compiled, ready-to-evaluate rule.
@@ -212,7 +213,11 @@ func compileCondition(field string, value interface{}) (Condition, error) {
 			cond.Regex = compiled
 		}
 	case []interface{}:
-		cond.Operator = OpIn
+		// Preserve modifier-based operator (e.g., contains+list → containsAny).
+		// Only default to OpIn when no modifier was specified (plain equality match).
+		if cond.Operator == OpEquals {
+			cond.Operator = OpIn
+		}
 		for _, item := range v {
 			cond.Values = append(cond.Values, fmt.Sprintf("%v", item))
 		}
@@ -256,20 +261,25 @@ func (cr *CompiledRule) Matches(event types.LogEvent) bool {
 
 // Evaluate checks a single condition against an event.
 func (c *Condition) Evaluate(event types.LogEvent) bool {
-	// Get the field value: check parsed fields first, then special fields.
-	value, ok := event.Fields[c.Field]
+	// Get the field value: try dotted lookup first, then special fields.
+	value, ok := platform.LookupField(event.Fields, c.Field)
 	if !ok {
 		switch c.Field {
 		case "raw", "message":
 			value = event.Raw
+			ok = true
 		case "source":
 			value = event.Source
+			ok = true
 		case "category":
 			value = event.Category
+			ok = true
 		case "hostname":
 			value = event.Hostname
+			ok = true
 		case "platform":
 			value = event.Platform
+			ok = true
 		default:
 			if c.Operator == OpExists {
 				return false
@@ -282,11 +292,39 @@ func (c *Condition) Evaluate(event types.LogEvent) bool {
 	case OpEquals:
 		return strings.EqualFold(value, c.Value)
 	case OpContains:
-		return strings.Contains(strings.ToLower(value), strings.ToLower(c.Value))
+		lower := strings.ToLower(value)
+		// When Values is populated (list), match if ANY value is a substring (OR).
+		if len(c.Values) > 0 {
+			for _, v := range c.Values {
+				if strings.Contains(lower, strings.ToLower(v)) {
+					return true
+				}
+			}
+			return false
+		}
+		return strings.Contains(lower, strings.ToLower(c.Value))
 	case OpStartsWith:
-		return strings.HasPrefix(strings.ToLower(value), strings.ToLower(c.Value))
+		lower := strings.ToLower(value)
+		if len(c.Values) > 0 {
+			for _, v := range c.Values {
+				if strings.HasPrefix(lower, strings.ToLower(v)) {
+					return true
+				}
+			}
+			return false
+		}
+		return strings.HasPrefix(lower, strings.ToLower(c.Value))
 	case OpEndsWith:
-		return strings.HasSuffix(strings.ToLower(value), strings.ToLower(c.Value))
+		lower := strings.ToLower(value)
+		if len(c.Values) > 0 {
+			for _, v := range c.Values {
+				if strings.HasSuffix(lower, strings.ToLower(v)) {
+					return true
+				}
+			}
+			return false
+		}
+		return strings.HasSuffix(lower, strings.ToLower(c.Value))
 	case OpRegex:
 		if c.Regex != nil {
 			return c.Regex.MatchString(value)

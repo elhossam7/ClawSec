@@ -34,7 +34,9 @@ func newScenarioLLM() *scenarioLLM {
 	}
 }
 
-func (m *scenarioLLM) Provider() string { return "mock_scenario" }
+func (m *scenarioLLM) Provider() string      { return "mock_scenario" }
+func (m *scenarioLLM) GetModel() string      { return "mock-scenario-model" }
+func (m *scenarioLLM) SetModel(model string) {}
 
 func (m *scenarioLLM) Complete(ctx context.Context, messages []agent.Message, tools []agent.ToolDef) (*agent.LLMResponse, error) {
 	m.calls++
@@ -76,7 +78,9 @@ type internalIPLLM struct {
 	calls int
 }
 
-func (m *internalIPLLM) Provider() string { return "mock_internal" }
+func (m *internalIPLLM) Provider() string      { return "mock_internal" }
+func (m *internalIPLLM) GetModel() string      { return "mock-internal-model" }
+func (m *internalIPLLM) SetModel(model string) {}
 func (m *internalIPLLM) Complete(ctx context.Context, messages []agent.Message, tools []agent.ToolDef) (*agent.LLMResponse, error) {
 	m.calls++
 	if m.calls == 1 {
@@ -108,7 +112,9 @@ func (m *internalIPLLM) Complete(ctx context.Context, messages []agent.Message, 
 
 type highRiskLLM struct{}
 
-func (m *highRiskLLM) Provider() string { return "mock_highrisk" }
+func (m *highRiskLLM) Provider() string      { return "mock_highrisk" }
+func (m *highRiskLLM) GetModel() string      { return "mock-highrisk-model" }
+func (m *highRiskLLM) SetModel(model string) {}
 func (m *highRiskLLM) Complete(ctx context.Context, messages []agent.Message, tools []agent.ToolDef) (*agent.LLMResponse, error) {
 	return &agent.LLMResponse{
 		Content: `{
@@ -456,6 +462,8 @@ func (f *failingLLM) Provider() string { return "mock_failing" }
 func (f *failingLLM) Complete(ctx context.Context, msgs []agent.Message, tools []agent.ToolDef) (*agent.LLMResponse, error) {
 	return nil, os.ErrClosed // Simulates API failure.
 }
+func (f *failingLLM) GetModel() string    { return "mock-failing" }
+func (f *failingLLM) SetModel(m string) {}
 
 // Scenario 8: validate SQLite agent tables exist
 func TestE2E_SQLiteTables_Created(t *testing.T) {

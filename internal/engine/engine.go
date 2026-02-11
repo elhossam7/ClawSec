@@ -69,17 +69,31 @@ func (e *Engine) AnalysisQueue() <-chan types.AnalysisRequest {
 }
 
 // LoadRules loads and compiles all rules from the given directory.
+// It also validates each rule against the event schema and warns about issues.
 func (e *Engine) LoadRules(dir string) error {
 	rules, err := LoadRulesFromDir(dir)
 	if err != nil {
 		return fmt.Errorf("loading rules from %s: %w", dir, err)
 	}
 
+	schema := NewSchema()
+
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	loaded := 0
 	for _, rule := range rules {
+		// Validate against schema (warn but don't block).
+		if issues := ValidateRule(rule, schema); len(issues) > 0 {
+			for _, issue := range issues {
+				if issue.Level == "error" {
+					e.logger.Warn().Str("rule", rule.ID).Str("field", issue.Field).Msg(issue.Message)
+				} else {
+					e.logger.Debug().Str("rule", rule.ID).Str("field", issue.Field).Msg(issue.Message)
+				}
+			}
+		}
+
 		compiled, err := CompileRule(rule)
 		if err != nil {
 			e.logger.Warn().Err(err).Str("rule", rule.ID).Msg("failed to compile rule, skipping")

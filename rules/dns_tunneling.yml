@@ -1,0 +1,37 @@
+id: dns_tunneling
+title: DNS Tunneling Detection
+description: Detects potential DNS tunneling activity by identifying unusually long DNS queries and high-frequency DNS requests to the same domain, which may indicate covert data exfiltration or C2 communication over DNS.
+severity: high
+status: active
+author: sentinel-ai
+tags:
+    - attack.command_and_control
+    - attack.exfiltration
+    - attack.t1071.004
+    - dns_tunneling
+logsource:
+    category: network
+    product: ""
+    service: dns
+detection:
+    selection_long_query:
+        raw|re: "dns.*query.{50,}"
+    selection_known_tools:
+        raw|contains:
+            - "iodine"
+            - "dnscat"
+            - "dns2tcp"
+            - "dnsexfiltrator"
+    selection_subdomain_length:
+        raw|re: "[a-zA-Z0-9]{30,}\\..*\\.(com|net|org|io|xyz)"
+    condition: selection_long_query or selection_known_tools or selection_subdomain_length
+correlation:
+    group_by:
+        - source_ip
+    threshold: 50
+    window: 5m
+response:
+    - type: alert
+      target_field: source_ip
+    - type: block_ip
+      target_field: source_ip

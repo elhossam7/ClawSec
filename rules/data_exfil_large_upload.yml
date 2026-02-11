@@ -1,0 +1,49 @@
+id: data_exfil_large_upload
+title: Data Exfiltration via Large Outbound Transfer
+description: Detects potential data exfiltration by identifying large outbound data transfers, use of common exfiltration tools, uploads to cloud storage services, and suspicious archiving before transfer.
+severity: high
+status: active
+author: sentinel-ai
+tags:
+    - attack.exfiltration
+    - attack.t1048
+    - attack.t1567
+    - data_exfiltration
+logsource:
+    category: network
+    product: ""
+    service: ""
+detection:
+    selection_upload_tools:
+        raw|contains:
+            - "curl -X POST"
+            - "curl --upload"
+            - "wget --post-file"
+            - "scp "
+            - "rsync "
+            - "rclone "
+    selection_cloud_upload:
+        raw|contains:
+            - "dropbox.com/upload"
+            - "drive.google.com"
+            - "s3.amazonaws.com"
+            - "blob.core.windows.net"
+            - "mega.nz"
+            - "transfer.sh"
+            - "file.io"
+    selection_archive_then_send:
+        raw|re: "(?i)(tar|zip|7z|rar)\\s+.*&&.*(curl|wget|scp|nc|ftp)"
+    selection_nc_transfer:
+        raw|re: "(?i)(nc|ncat)\\s+.*\\s+<\\s+"
+    condition: selection_upload_tools or selection_cloud_upload or selection_archive_then_send or selection_nc_transfer
+correlation:
+    group_by:
+        - source_ip
+        - username
+    threshold: 3
+    window: 10m
+response:
+    - type: alert
+      target_field: source_ip
+    - type: block_ip
+      target_field: source_ip

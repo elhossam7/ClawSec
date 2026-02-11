@@ -3,22 +3,27 @@
 package platform
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/sentinel-agent/sentinel/internal/types"
 )
 
-// EventLogSource monitors Windows Event Log channels using wevtutil.
+// EventLogSource monitors Windows Event Log channels.
+// It uses PowerShell Register-WmiEvent streaming by default and falls
+// back to polling if streaming is unavailable.
 type EventLogSource struct {
 	channels []string
 	logger   zerolog.Logger
 	cancel   context.CancelFunc
+	wg       sync.WaitGroup
 }
 
 // NewEventLogSource creates a Windows Event Log source.
@@ -37,28 +42,152 @@ func (e *EventLogSource) Start(ctx context.Context, events chan<- types.LogEvent
 	ctx, e.cancel = context.WithCancel(ctx)
 
 	hostname, _ := os.Hostname()
-	ticker := time.NewTicker(5 * time.Second) // Poll interval
+
+	for _, channel := range e.channels {
+		ch := channel
+		e.wg.Add(1)
+		go func() {
+			defer e.wg.Done()
+			e.streamChannel(ctx, ch, hostname, events)
+		}()
+	}
+
+	// Block until context is cancelled.
+	<-ctx.Done()
+	e.wg.Wait()
+	return nil
+}
+
+func (e *EventLogSource) Stop() error {
+	if e.cancel != nil {
+		e.cancel()
+	}
+	e.wg.Wait()
+	return nil
+}
+
+// streamChannel tries streaming via Get-WinEvent -Wait first.
+// If the streaming process exits unexpectedly, it falls back to polling.
+func (e *EventLogSource) streamChannel(ctx context.Context, channel, hostname string, events chan<- types.LogEvent) {
+	e.logger.Info().Str("channel", channel).Msg("starting event log stream")
+
+	for {
+		// Attempt streaming. If it returns without ctx being cancelled, fall back.
+		err := e.runStreaming(ctx, channel, hostname, events)
+		if ctx.Err() != nil {
+			return // Normal shutdown.
+		}
+
+		e.logger.Warn().Err(err).Str("channel", channel).Msg("event log stream ended, falling back to polling")
+		e.runPolling(ctx, channel, hostname, events)
+		if ctx.Err() != nil {
+			return
+		}
+
+		// Brief pause before retrying streaming.
+		select {
+		case <-time.After(5 * time.Second):
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// runStreaming launches a long-running PowerShell process that continuously
+// tails the specified event log channel using Get-WinEvent with a tight
+// poll loop and outputs one event per line.
+func (e *EventLogSource) runStreaming(ctx context.Context, channel, hostname string, events chan<- types.LogEvent) error {
+	// PowerShell script that continuously reads new events.
+	// We use a small poll interval inside PS to get near-real-time delivery.
+	psScript := fmt.Sprintf(`
+$lastTime = (Get-Date)
+while ($true) {
+    $evts = Get-WinEvent -FilterHashtable @{LogName='%s'; StartTime=$lastTime} -MaxEvents 50 -ErrorAction SilentlyContinue
+    if ($evts) {
+        foreach ($ev in $evts) {
+            Write-Output "$($ev.TimeCreated)|$($ev.Id)|$($ev.LevelDisplayName)|$($ev.Message -replace '\r?\n',' ')"
+        }
+        $lastTime = ($evts | Select-Object -First 1).TimeCreated.AddMilliseconds(1)
+    }
+    Start-Sleep -Milliseconds 500
+}
+`, channel)
+
+	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NoLogo", "-Command", psScript)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("creating stdout pipe: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("starting streaming process: %w", err)
+	}
+
+	e.logger.Info().Str("channel", channel).Int("pid", cmd.Process.Pid).Msg("event log streaming started")
+
+	scanner := bufio.NewScanner(stdout)
+	scanner.Buffer(make([]byte, 64*1024), 256*1024) // handle long messages
+
+	for scanner.Scan() {
+		if ctx.Err() != nil {
+			break
+		}
+
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+
+		ev := parseEventLine(channel, line, hostname)
+		select {
+		case events <- ev:
+		case <-ctx.Done():
+			break
+		}
+	}
+
+	// Kill the process if still running.
+	if cmd.Process != nil {
+		cmd.Process.Kill()
+	}
+	cmd.Wait()
+
+	if ctx.Err() != nil {
+		return nil
+	}
+	return fmt.Errorf("streaming process exited")
+}
+
+// runPolling is the fallback: queries events every 2 seconds.
+func (e *EventLogSource) runPolling(ctx context.Context, channel, hostname string, events chan<- types.LogEvent) {
+	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
 	lastCheck := time.Now()
+	maxPolls := 60 // After 60 polls (~2 min), try streaming again.
+	polls := 0
 
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return
 		case <-ticker.C:
-			for _, channel := range e.channels {
-				newEvents, err := e.queryEvents(ctx, channel, lastCheck, hostname)
-				if err != nil {
-					e.logger.Error().Err(err).Str("channel", channel).Msg("failed to query event log")
-					continue
-				}
-				for _, ev := range newEvents {
-					select {
-					case events <- ev:
-					case <-ctx.Done():
-						return nil
-					}
+			polls++
+			if polls > maxPolls {
+				e.logger.Info().Str("channel", channel).Msg("polling limit reached, will retry streaming")
+				return
+			}
+
+			newEvents, err := e.queryEvents(ctx, channel, lastCheck, hostname)
+			if err != nil {
+				e.logger.Error().Err(err).Str("channel", channel).Msg("poll query failed")
+				continue
+			}
+			for _, ev := range newEvents {
+				select {
+				case events <- ev:
+				case <-ctx.Done():
+					return
 				}
 			}
 			lastCheck = time.Now()
@@ -66,27 +195,18 @@ func (e *EventLogSource) Start(ctx context.Context, events chan<- types.LogEvent
 	}
 }
 
-func (e *EventLogSource) Stop() error {
-	if e.cancel != nil {
-		e.cancel()
-	}
-	return nil
-}
-
-// queryEvents uses PowerShell Get-WinEvent to retrieve recent events.
+// queryEvents uses PowerShell Get-WinEvent to retrieve recent events (polling fallback).
 func (e *EventLogSource) queryEvents(ctx context.Context, channel string, since time.Time, hostname string) ([]types.LogEvent, error) {
-	// Build PowerShell command to query events since last check.
 	sinceStr := since.Format("2006-01-02T15:04:05")
 	psCmd := fmt.Sprintf(
-		`Get-WinEvent -FilterHashtable @{LogName='%s'; StartTime='%s'} -MaxEvents 100 -ErrorAction SilentlyContinue | ForEach-Object { "$($_.TimeCreated)|$($_.Id)|$($_.LevelDisplayName)|$($_.Message)" }`,
+		`Get-WinEvent -FilterHashtable @{LogName='%s'; StartTime='%s'} -MaxEvents 100 -ErrorAction SilentlyContinue | ForEach-Object { "$($_.TimeCreated)|$($_.Id)|$($_.LevelDisplayName)|$($_.Message -replace '\r?\n',' ')" }`,
 		channel, sinceStr,
 	)
 
 	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-Command", psCmd)
 	output, err := cmd.Output()
 	if err != nil {
-		// No events found is not an error.
-		return nil, nil
+		return nil, nil // No events found is not an error.
 	}
 
 	var events []types.LogEvent
@@ -96,23 +216,26 @@ func (e *EventLogSource) queryEvents(ctx context.Context, channel string, since 
 		if line == "" {
 			continue
 		}
-
-		parts := strings.SplitN(line, "|", 4)
-		ev := types.LogEvent{
-			ID:        fmt.Sprintf("evtlog_%d", time.Now().UnixNano()),
-			Timestamp: time.Now(),
-			Source:    fmt.Sprintf("eventlog:%s", channel),
-			Category:  categorizeEventLog(channel, line),
-			Severity:  detectEventLogSeverity(parts),
-			Hostname:  hostname,
-			Raw:       line,
-			Fields:    parseEventLogLine(parts),
-			Platform:  "windows",
-		}
-		events = append(events, ev)
+		events = append(events, parseEventLine(channel, line, hostname))
 	}
 
 	return events, nil
+}
+
+// parseEventLine converts a piped event log line to a LogEvent.
+func parseEventLine(channel, line, hostname string) types.LogEvent {
+	parts := strings.SplitN(line, "|", 4)
+	return types.LogEvent{
+		ID:        fmt.Sprintf("evtlog_%d", time.Now().UnixNano()),
+		Timestamp: time.Now(),
+		Source:    fmt.Sprintf("eventlog:%s", channel),
+		Category:  categorizeEventLog(channel, line),
+		Severity:  detectEventLogSeverity(parts),
+		Hostname:  hostname,
+		Raw:       line,
+		Fields:    parseEventLogLine(parts),
+		Platform:  "windows",
+	}
 }
 
 // categorizeEventLog determines the category based on channel and content.
@@ -186,7 +309,7 @@ func parseEventLogLine(parts []string) map[string]string {
 		// Extract account name.
 		if idx := strings.Index(lower, "account name:"); idx >= 0 {
 			rest := strings.TrimSpace(msg[idx+13:])
-			if nlIdx := strings.IndexAny(rest, "\n\r\t"); nlIdx > 0 {
+			if nlIdx := strings.IndexAny(rest, "\n\r\t "); nlIdx > 0 {
 				fields["username"] = strings.TrimSpace(rest[:nlIdx])
 			} else {
 				fields["username"] = strings.TrimSpace(rest)

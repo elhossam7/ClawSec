@@ -1,0 +1,43 @@
+id: suspicious_scheduled_task
+title: Suspicious Scheduled Task Creation
+description: Detects creation of scheduled tasks via schtasks.exe or at command that could indicate persistence mechanisms. Attackers commonly use scheduled tasks to maintain access or execute malicious payloads at defined intervals.
+severity: high
+status: active
+author: sentinel-ai
+tags:
+    - attack.persistence
+    - attack.execution
+    - attack.t1053.005
+    - scheduled_task
+logsource:
+    category: process_creation
+    product: ""
+    service: ""
+detection:
+    selection_schtasks_create:
+        raw|re: "(?i)schtasks\\s+/create"
+    selection_at_command:
+        raw|re: "(?i)at\\s+\\d{1,2}[:.]+\\d{2}\\s+"
+    selection_suspicious_payload:
+        command_line|contains:
+            - "powershell"
+            - "cmd.exe /c"
+            - "mshta"
+            - "wscript"
+            - "cscript"
+            - "regsvr32"
+            - "rundll32"
+            - "certutil"
+    selection_system_task:
+        raw|re: "(?i)schtasks.*/ru\\s+(SYSTEM|NT AUTHORITY)"
+    selection_encoded:
+        raw|contains:
+            - "-encodedcommand"
+            - "-enc "
+            - "FromBase64String"
+    condition: (selection_schtasks_create or selection_at_command) and (selection_suspicious_payload or selection_system_task or selection_encoded)
+response:
+    - type: alert
+      target_field: username
+    - type: kill_process
+      target_field: pid

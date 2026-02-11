@@ -19,6 +19,8 @@ type Config struct {
 	Response ResponseConfig `yaml:"response"`
 	Web      WebConfig      `yaml:"web"`
 	Telegram TelegramConfig `yaml:"telegram"`
+	Webhook  WebhookConfig  `yaml:"webhook"`
+	Slack    SlackConfig    `yaml:"slack"`
 	Storage  StorageConfig  `yaml:"storage"`
 	Logging  LoggingConfig  `yaml:"logging"`
 	AI       AIConfig       `yaml:"ai"`
@@ -106,6 +108,21 @@ type TelegramConfig struct {
 	BotToken     string  `yaml:"bot_token"`
 	AllowedChats []int64 `yaml:"allowed_chats"` // Whitelisted chat IDs
 	WebhookURL   string  `yaml:"webhook_url,omitempty"`
+}
+
+// WebhookConfig controls the generic HTTP webhook alerter.
+type WebhookConfig struct {
+	Enabled bool              `yaml:"enabled"`
+	URL     string            `yaml:"url"`
+	Secret  string            `yaml:"secret,omitempty"`  // Used for HMAC-SHA256 signing
+	Headers map[string]string `yaml:"headers,omitempty"` // Extra HTTP headers
+}
+
+// SlackConfig controls the Slack Block Kit alerter.
+type SlackConfig struct {
+	Enabled    bool   `yaml:"enabled"`
+	WebhookURL string `yaml:"webhook_url"`
+	Channel    string `yaml:"channel,omitempty"` // Override default webhook channel
 }
 
 // StorageConfig controls the persistence layer.
@@ -203,6 +220,12 @@ func DefaultConfig() *Config {
 		Telegram: TelegramConfig{
 			Enabled: false,
 		},
+		Webhook: WebhookConfig{
+			Enabled: false,
+		},
+		Slack: SlackConfig{
+			Enabled: false,
+		},
 		Storage: StorageConfig{
 			Driver: "sqlite",
 			DSN:    "./data/sentinel.db",
@@ -298,6 +321,12 @@ func (c *Config) Validate() error {
 	}
 	if c.Telegram.Enabled && c.Telegram.BotToken == "" {
 		return fmt.Errorf("telegram.bot_token is required when telegram is enabled")
+	}
+	if c.Webhook.Enabled && c.Webhook.URL == "" {
+		return fmt.Errorf("webhook.url is required when webhook is enabled")
+	}
+	if c.Slack.Enabled && c.Slack.WebhookURL == "" {
+		return fmt.Errorf("slack.webhook_url is required when slack is enabled")
 	}
 	if c.Engine.Workers < 1 {
 		c.Engine.Workers = 1

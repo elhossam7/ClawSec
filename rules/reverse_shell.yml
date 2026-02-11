@@ -1,0 +1,45 @@
+id: reverse_shell
+title: Reverse Shell Execution Detection
+description: Detects reverse shell patterns including bash interactive shells, netcat with execute flags, Python PTY spawns, and other common reverse shell one-liners used to establish interactive backdoor sessions.
+severity: critical
+status: active
+author: sentinel-ai
+tags:
+    - attack.execution
+    - attack.command_and_control
+    - attack.t1059
+    - attack.t1071
+    - reverse_shell
+logsource:
+    category: process_creation
+    product: ""
+    service: ""
+detection:
+    selection_bash_reverse:
+        raw|re: "(?i)bash\\s+-i\\s+>&\\s*/dev/tcp/"
+    selection_nc_exec:
+        raw|re: "(?i)(nc|ncat|netcat)\\s+.*\\s+-(e|c)\\s+"
+    selection_python_pty:
+        raw|contains:
+            - "pty.spawn"
+            - "import pty"
+            - "python -c"
+        raw|re: "(?i)python[23]?.*socket.*connect"
+    selection_perl_shell:
+        raw|re: "(?i)perl.*socket.*INET"
+    selection_mkfifo:
+        raw|re: "(?i)mkfifo.*/tmp/.*\\|.*sh"
+    selection_command_line:
+        command_line|contains:
+            - "/dev/tcp/"
+            - "bash -i"
+            - "nc -e /bin"
+            - "pty.spawn"
+    condition: selection_bash_reverse or selection_nc_exec or selection_python_pty or selection_perl_shell or selection_mkfifo or selection_command_line
+response:
+    - type: kill_process
+      target_field: pid
+    - type: block_ip
+      target_field: source_ip
+    - type: alert
+      target_field: username

@@ -1,0 +1,17 @@
+id: supply_chain_crontab_modification
+title: Unauthorized Crontab Modification
+description: Monitors for changes to scheduled tasks on Linux systems via crontab paths.
+severity: medium
+status: active
+author: sentinel-ai
+tags:
+  - attack.persistence
+  - attack.t1053
+logsource:
+    category: system
+    product: ""
+    service: ""
+detection:
+    selection:
+        raw|re: (/etc/crontab|/etc/cron\.d/|/var/spool/cron/crontabs/|crontab\s+-[elri])
+    condition: selection
