@@ -1,203 +1,569 @@
 {{define "dashboard-content"}}
-<!-- ═══ Stat Cards ═══ -->
-<div class="stats-grid">
-    <div class="stat-card events">
-        <div class="stat-card-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-            </svg>
-        </div>
-        <div class="stat-card-value" data-counter="{{.EventCount}}">{{.EventCount}}</div>
-        <div class="stat-card-label">Total Events</div>
-    </div>
+<style>
+/* Dashboard Scoped Styles */
+.dash-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.08) 0%, rgba(139, 92, 246, 0.05) 100%);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    border-radius: 12px;
+    margin-bottom: 24px;
+}
+.dash-header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #e2e8f0;
+    margin: 0 0 4px 0;
+}
+.dash-header p {
+    color: #94a3b8;
+    font-size: 0.9rem;
+    margin: 0;
+}
+.threat-badge {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.threat-badge.normal { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+.threat-badge.elevated { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+.threat-badge.critical { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
 
-    <div class="stat-card incidents">
-        <div class="stat-card-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                <line x1="12" y1="9" x2="12" y2="13"/>
-                <line x1="12" y1="17" x2="12.01" y2="17"/>
-            </svg>
-        </div>
-        <div class="stat-card-value" data-counter="{{len .Incidents}}">{{len .Incidents}}</div>
-        <div class="stat-card-label">Open Incidents</div>
-    </div>
+.dash-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    margin-bottom: 24px;
+}
+.dash-stat {
+    background: #0d1525;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+}
+.dash-stat::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+}
+.dash-stat.events::before { background: linear-gradient(90deg, #00d4ff, #8b5cf6); }
+.dash-stat.incidents::before { background: linear-gradient(90deg, #ef4444, #f97316); }
+.dash-stat.pending::before { background: linear-gradient(90deg, #f59e0b, #eab308); }
+.dash-stat.rules::before { background: linear-gradient(90deg, #10b981, #22d3ee); }
+.dash-stat-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+.dash-stat-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.04);
+}
+.dash-stat-icon svg { width: 20px; height: 20px; }
+.dash-stat.events .dash-stat-icon { color: #00d4ff; }
+.dash-stat.incidents .dash-stat-icon { color: #ef4444; }
+.dash-stat.pending .dash-stat-icon { color: #f59e0b; }
+.dash-stat.rules .dash-stat-icon { color: #10b981; }
+.dash-stat-badge {
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 12px;
+    text-transform: uppercase;
+}
+.dash-stat-badge.active { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+.dash-stat-badge.alert { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.dash-stat-badge.ok { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+.dash-stat-badge.warn { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.dash-stat-value {
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: #e2e8f0;
+    line-height: 1;
+    margin-bottom: 4px;
+}
+.dash-stat-label {
+    font-size: 0.82rem;
+    color: #64748b;
+}
 
-    <div class="stat-card pending">
-        <div class="stat-card-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-                <polyline points="12 6 12 12 16 14"/>
-            </svg>
-        </div>
-        <div class="stat-card-value" data-counter="{{len .PendingActions}}">{{len .PendingActions}}</div>
-        <div class="stat-card-label">Pending Actions</div>
-    </div>
+.dash-grid {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 24px;
+}
+.dash-main { display: flex; flex-direction: column; gap: 20px; }
+.dash-side { display: flex; flex-direction: column; gap: 20px; }
 
-    <div class="stat-card rules">
-        <div class="stat-card-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
-        </div>
-        <div class="stat-card-value" data-counter="{{.ActiveRules}}">{{.ActiveRules}}</div>
-        <div class="stat-card-label">Active Rules</div>
+.dash-card {
+    background: #0d1525;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    overflow: hidden;
+}
+.dash-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.dash-card-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+.dash-card-title .icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.dash-card-title .icon svg { width: 16px; height: 16px; }
+.dash-card-title .icon.danger { background: rgba(239, 68, 68, 0.12); color: #ef4444; }
+.dash-card-title .icon.accent { background: rgba(0, 212, 255, 0.12); color: #00d4ff; }
+.dash-card-title .icon.warning { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
+.dash-card-title .icon.ai { background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(0, 212, 255, 0.15)); color: #a78bfa; }
+.dash-card-title .count {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+.dash-card-body { padding: 16px 20px; }
+.dash-card-body-flush { padding: 0; }
+
+.incident-list { }
+.incident-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    transition: background 0.15s;
+}
+.incident-item:hover { background: rgba(255, 255, 255, 0.02); }
+.incident-item:last-child { border-bottom: none; }
+.incident-list-mini { max-height: 180px; overflow: hidden; }
+.incident-more {
+    padding: 10px 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    text-align: center;
+}
+.incident-more a {
+    color: var(--accent, #00d4ff);
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-decoration: none;
+}
+.incident-more a:hover { text-decoration: underline; }
+.incident-info { flex: 1; min-width: 0; }
+.incident-info h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin: 0 0 4px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.incident-info .meta {
+    display: flex;
+    gap: 12px;
+    font-size: 0.78rem;
+    color: #64748b;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+}
+.empty-state .icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: rgba(16, 185, 129, 0.12);
+    color: #10b981;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+}
+.empty-state .icon svg { width: 28px; height: 28px; }
+.empty-state h3 { font-size: 1.1rem; color: #e2e8f0; margin: 0 0 6px 0; }
+.empty-state p { color: #64748b; font-size: 0.88rem; margin: 0; }
+
+.live-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.12);
+    padding: 5px 12px;
+    border-radius: 16px;
+}
+.live-badge .dot {
+    width: 6px;
+    height: 6px;
+    background: #10b981;
+    border-radius: 50%;
+    animation: blink 1.5s infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+.event-list { max-height: 280px; overflow-y: auto; }
+.event-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.event-item:last-child { border-bottom: none; }
+.event-bar {
+    width: 3px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+.event-bar.low { background: #3b82f6; }
+.event-bar.medium { background: #f59e0b; }
+.event-bar.high { background: #ef4444; }
+.event-bar.critical { background: #dc2626; }
+.event-content { flex: 1; min-width: 0; }
+.event-content .head {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+}
+.event-content .tag {
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+.event-content .tag.source { background: rgba(0, 212, 255, 0.12); color: #00d4ff; }
+.event-content .tag.cat { background: rgba(255, 255, 255, 0.06); color: #94a3b8; }
+.event-content .time { font-size: 0.72rem; color: #64748b; margin-left: auto; font-family: 'JetBrains Mono', monospace; }
+.event-content .msg { font-size: 0.82rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.health-list { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.health-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
+}
+.health-item .icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.health-item .icon svg { width: 14px; height: 14px; }
+.health-item .icon.ok { background: rgba(16, 185, 129, 0.12); color: #10b981; }
+.health-item .icon.warn { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
+.health-item .icon.bad { background: rgba(239, 68, 68, 0.12); color: #ef4444; }
+.health-item .info .label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em; }
+.health-item .info .val { font-size: 0.9rem; font-weight: 600; color: #e2e8f0; }
+.health-item .info .val.red { color: #ef4444; }
+.health-item .info .val.yellow { color: #f59e0b; }
+
+.quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.quick-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 16px 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    color: #94a3b8;
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 500;
+    transition: all 0.15s;
+    position: relative;
+}
+.quick-btn svg { width: 20px; height: 20px; opacity: 0.7; }
+.quick-btn:hover { background: rgba(255, 255, 255, 0.04); border-color: #00d4ff; color: #e2e8f0; }
+.quick-btn:hover svg { opacity: 1; color: #00d4ff; }
+.quick-btn .badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 8px;
+    background: #00d4ff;
+    color: #060b18;
+}
+.quick-btn .badge.red { background: #ef4444; color: #fff; }
+
+@media (max-width: 1100px) {
+    .dash-stats { grid-template-columns: repeat(2, 1fr); }
+    .dash-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+    .dash-stats { grid-template-columns: 1fr; }
+    .dash-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .health-list { grid-template-columns: 1fr; }
+}
+</style>
+
+<!-- Dashboard Header -->
+<div class="dash-header">
+    <div>
+        <h1>Security Operations Center</h1>
+        <p>Real-time threat monitoring and incident response</p>
+    </div>
+    <div class="threat-badge {{if .Incidents}}elevated{{else}}normal{{end}}">
+        Threat Level: {{if .Incidents}}Elevated{{else}}Normal{{end}}
     </div>
 </div>
 
-<!-- ═══ Dashboard Grid: Incidents + System Info ═══ -->
-<div class="dashboard-grid section-mb">
+<!-- Stats Row -->
+<div class="dash-stats">
+    <div class="dash-stat events">
+        <div class="dash-stat-top">
+            <div class="dash-stat-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            </div>
+            <span class="dash-stat-badge active">Active</span>
+        </div>
+        <div class="dash-stat-value">{{.EventCount}}</div>
+        <div class="dash-stat-label">Total Events</div>
+    </div>
+    <div class="dash-stat incidents">
+        <div class="dash-stat-top">
+            <div class="dash-stat-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <span class="dash-stat-badge {{if .Incidents}}alert{{else}}ok{{end}}">{{if .Incidents}}Active{{else}}Clear{{end}}</span>
+        </div>
+        <div class="dash-stat-value">{{len .Incidents}}</div>
+        <div class="dash-stat-label">Open Incidents</div>
+    </div>
+    <div class="dash-stat pending">
+        <div class="dash-stat-top">
+            <div class="dash-stat-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <span class="dash-stat-badge {{if .PendingActions}}warn{{else}}ok{{end}}">{{if .PendingActions}}Waiting{{else}}Done{{end}}</span>
+        </div>
+        <div class="dash-stat-value">{{len .PendingActions}}</div>
+        <div class="dash-stat-label">Pending Actions</div>
+    </div>
+    <div class="dash-stat rules">
+        <div class="dash-stat-top">
+            <div class="dash-stat-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <span class="dash-stat-badge ok">Active</span>
+        </div>
+        <div class="dash-stat-value">{{.ActiveRules}}</div>
+        <div class="dash-stat-label">Active Rules</div>
+    </div>
+</div>
 
-    <!-- Active Incidents Table -->
-    <div class="card">
-        <div class="card-header">
-            <div>
-                <div class="card-title">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                    </svg>
+<!-- Main Grid -->
+<div class="dash-grid">
+    <div class="dash-main">
+        <!-- Incidents Card -->
+        <div class="dash-card">
+            <div class="dash-card-header">
+                <div class="dash-card-title">
+                    <div class="icon danger">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    </div>
                     Active Incidents
+                    {{if .Incidents}}<span class="count">{{len .Incidents}}</span>{{end}}
                 </div>
-                <div class="card-subtitle">Current open security incidents</div>
+                <a href="/incidents" hx-get="/incidents" hx-target="#main-content" hx-push-url="true" class="btn btn-ghost btn-sm">View All →</a>
             </div>
-            <a href="/incidents" hx-get="/incidents" hx-target="#main-content" hx-push-url="true" class="btn btn-ghost btn-sm">View All</a>
+            {{if .Incidents}}
+            <div class="dash-card-body-flush">
+                <div class="incident-list incident-list-mini">
+                    {{$count := 0}}
+                    {{range .Incidents}}{{if lt $count 3}}
+                    <div class="incident-item">
+                        {{severityBadge .Severity}}
+                        <div class="incident-info">
+                            <h4>{{.Title}}</h4>
+                            <div class="meta">
+                                {{if .SourceIP}}<span>{{.SourceIP}}</span>{{end}}
+                                <span>{{timeAgo .CreatedAt}}</span>
+                            </div>
+                        </div>
+                        {{statusBadge (printf "%s" .Status)}}
+                    </div>
+                    {{$count = add $count 1}}{{end}}{{end}}
+                </div>
+                {{if gt (len .Incidents) 3}}
+                <div class="incident-more">
+                    <a href="/incidents" hx-get="/incidents" hx-target="#main-content" hx-push-url="true">+{{sub (len .Incidents) 3}} more incidents</a>
+                </div>
+                {{end}}
+            </div>
+            {{else}}
+            <div class="dash-card-body">
+                <div class="empty-state">
+                    <div class="icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+                    </div>
+                    <h3>All Systems Secure</h3>
+                    <p>No active incidents detected</p>
+                </div>
+            </div>
+            {{end}}
         </div>
-        {{if .Incidents}}
-        <div class="card-body-flush">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Severity</th>
-                        <th>Title</th>
-                        <th>Source IP</th>
-                        <th>Status</th>
-                        <th>Time</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {{range .Incidents}}
-                    <tr>
-                        <td>{{severityBadge .Severity}}</td>
-                        <td class="td-primary">{{.Title}}</td>
-                        <td><span class="mono-text">{{.SourceIP}}</span></td>
-                        <td>{{statusBadge (printf "%s" .Status)}}</td>
-                        <td class="td-muted"><span class="mono-text">{{timeAgo .CreatedAt}}</span></td>
-                    </tr>
+
+        <!-- Event Stream -->
+        <div class="dash-card">
+            <div class="dash-card-header">
+                <div class="dash-card-title">
+                    <div class="icon accent">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    </div>
+                    Event Stream
+                </div>
+                <div class="live-badge"><span class="dot"></span> Live</div>
+            </div>
+            <div class="dash-card-body-flush">
+                <div class="event-list" id="event-stream" sse-swap="new_event" hx-swap="afterbegin">
+                    {{range .Events}}
+                    <div class="event-item">
+                        <div class="event-bar {{.Severity}}"></div>
+                        <div class="event-content">
+                            <div class="head">
+                                <span class="tag source">{{.Source}}</span>
+                                <span class="tag cat">{{.Category}}</span>
+                                <span class="time">{{timeAgo .Timestamp}}</span>
+                            </div>
+                            <div class="msg">{{.Raw}}</div>
+                        </div>
+                    </div>
                     {{end}}
-                </tbody>
-            </table>
-        </div>
-        {{else}}
-        <div class="empty-state">
-            <div class="empty-state-icon" style="background: rgba(16,185,129,0.06);">
-                <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                    <path d="M9 12l2 2 4-4"/>
-                </svg>
+                </div>
             </div>
-            <div class="empty-state-title">All Clear</div>
-            <div class="empty-state-desc">No active incidents detected</div>
         </div>
-        {{end}}
     </div>
 
-    <!-- System + Agent Overview stacked -->
-    <div class="dashboard-side-stack">
-
-        <!-- System Overview -->
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-                        <line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-                    </svg>
-                    System Overview
+    <div class="dash-side">
+        <!-- System Health -->
+        <div class="dash-card">
+            <div class="dash-card-header">
+                <div class="dash-card-title">
+                    <div class="icon accent">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                    </div>
+                    System Health
                 </div>
             </div>
-            <div class="card-body-flush">
-                <div class="info-list">
-                    <div class="info-item">
-                        <span class="info-item-label">Uptime</span>
-                        <span class="info-item-value">{{.Uptime}}</span>
+            <div class="dash-card-body">
+                <div class="health-list">
+                    <div class="health-item">
+                        <div class="icon ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+                        <div class="info"><div class="label">Uptime</div><div class="val">{{.Uptime}}</div></div>
                     </div>
-                    <div class="info-item">
-                        <span class="info-item-label">Total Events</span>
-                        <span class="info-item-value">{{.EventCount}}</span>
+                    <div class="health-item">
+                        <div class="icon ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+                        <div class="info"><div class="label">Rules</div><div class="val">{{.ActiveRules}}</div></div>
                     </div>
-                    <div class="info-item">
-                        <span class="info-item-label">Active Rules</span>
-                        <span class="info-item-value" style="color: var(--color-success);">{{.ActiveRules}}</span>
+                    <div class="health-item">
+                        <div class="icon {{if .Incidents}}bad{{else}}ok{{end}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg></div>
+                        <div class="info"><div class="label">Incidents</div><div class="val {{if .Incidents}}red{{end}}">{{len .Incidents}}</div></div>
                     </div>
-                    <div class="info-item">
-                        <span class="info-item-label">Open Incidents</span>
-                        <span class="info-item-value {{if .Incidents}}info-val-danger{{else}}info-val-success{{end}}">{{len .Incidents}}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-item-label">Pending Actions</span>
-                        <span class="info-item-value {{if .PendingActions}}info-val-warning{{else}}info-val-success{{end}}">{{len .PendingActions}}</span>
+                    <div class="health-item">
+                        <div class="icon {{if .PendingActions}}warn{{else}}ok{{end}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+                        <div class="info"><div class="label">Pending</div><div class="val {{if .PendingActions}}yellow{{end}}">{{len .PendingActions}}</div></div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- AI Agent Status -->
-        <div class="card ai-agent-card">
-            <div class="card-header">
-                <div class="card-title">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-                    </svg>
+        <!-- AI Agent -->
+        <div class="dash-card">
+            <div class="dash-card-header">
+                <div class="dash-card-title">
+                    <div class="icon ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div>
                     AI Agent
                 </div>
                 <a href="/chat" hx-get="/chat" hx-target="#main-content" hx-push-url="true" class="btn btn-ghost btn-sm">Open Chat</a>
             </div>
-            <div class="card-body-flush" id="dash-agent-status"
-                 hx-get="/partials/agent-status" hx-trigger="load, every 30s"
-                 hx-target="#dash-agent-status" hx-swap="innerHTML">
-                <div class="info-list">
-                    <div class="info-item">
-                        <span class="info-item-label">Status</span>
-                        <span class="info-item-value" style="color: var(--text-muted);">Loading...</span>
-                    </div>
+            <div class="dash-card-body" id="dash-agent-status" hx-get="/partials/agent-status" hx-trigger="load, every 30s" hx-target="#dash-agent-status" hx-swap="innerHTML">
+                <div style="display: flex; align-items: center; gap: 10px; color: #64748b; font-size: 0.88rem;">
+                    <div style="width: 16px; height: 16px; border: 2px solid #1e293b; border-top-color: #00d4ff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                    Checking status...
                 </div>
             </div>
         </div>
 
+        <!-- Quick Actions -->
+        <div class="dash-card">
+            <div class="dash-card-header">
+                <div class="dash-card-title">
+                    <div class="icon warning"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+                    Quick Actions
+                </div>
+            </div>
+            <div class="dash-card-body">
+                <div class="quick-grid">
+                    <a href="/approval" hx-get="/approval" hx-target="#main-content" hx-push-url="true" class="quick-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+                        Approvals
+                        {{if .PendingActions}}<span class="badge">{{len .PendingActions}}</span>{{end}}
+                    </a>
+                    <a href="/rules" hx-get="/rules" hx-target="#main-content" hx-push-url="true" class="quick-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        Rules
+                    </a>
+                    <a href="/audit" hx-get="/audit" hx-target="#main-content" hx-push-url="true" class="quick-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                        Audit Log
+                    </a>
+                    <a href="/incidents" hx-get="/incidents" hx-target="#main-content" hx-push-url="true" class="quick-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        Incidents
+                        {{if .Incidents}}<span class="badge red">{{len .Incidents}}</span>{{end}}
+                    </a>
+                </div>
+            </div>
+        </div>
     </div>
-
 </div>
 
-<!-- ═══ Live Event Stream ═══ -->
-<div class="card">
-    <div class="card-header">
-        <div>
-            <div class="card-title">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                </svg>
-                Event Stream
-            </div>
-            <div class="card-subtitle">Real-time security event feed</div>
-        </div>
-        <div class="live-indicator">
-            <span class="live-dot"></span>
-            Live
-        </div>
-    </div>
-    <div class="event-stream-wrap">
-        <div id="event-stream" class="event-stream" sse-swap="new_event" hx-swap="afterbegin">
-            {{range .Events}}
-            <div class="event-row">
-                <span class="event-time">{{timeAgo .Timestamp}}</span>
-                <span class="event-severity-dot {{.Severity}}"></span>
-                <span class="event-source">{{.Source}}</span>
-                <span class="event-category">{{.Category}}</span>
-                <span class="event-message">{{.Raw}}</span>
-            </div>
-            {{end}}
-        </div>
-    </div>
-</div>
+<style>@keyframes spin { to { transform: rotate(360deg); } }</style>
 {{end}}

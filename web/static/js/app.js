@@ -28,6 +28,38 @@
   });
 
   // ────────────────────────────────────────────
+  // Sidebar Collapse (desktop)
+  // ────────────────────────────────────────────
+  window.toggleSidebarCollapse = function () {
+    var sidebar = document.getElementById('sidebar');
+    var appShell = document.querySelector('.app-shell');
+    if (sidebar && appShell) {
+      var isCollapsed = sidebar.classList.toggle('collapsed');
+      appShell.classList.toggle('sidebar-collapsed', isCollapsed);
+      // Persist state
+      try {
+        localStorage.setItem('sidebarCollapsed', isCollapsed ? '1' : '0');
+      } catch (e) {}
+    }
+  };
+
+  // Restore sidebar state on load
+  function restoreSidebarState() {
+    try {
+      var collapsed = localStorage.getItem('sidebarCollapsed') === '1';
+      if (collapsed) {
+        var sidebar = document.getElementById('sidebar');
+        var appShell = document.querySelector('.app-shell');
+        if (sidebar && appShell) {
+          sidebar.classList.add('collapsed');
+          appShell.classList.add('sidebar-collapsed');
+        }
+      }
+    } catch (e) {}
+  }
+  restoreSidebarState();
+
+  // ────────────────────────────────────────────
   // Active Navigation Tracking
   // ────────────────────────────────────────────
   function updateActiveNav() {

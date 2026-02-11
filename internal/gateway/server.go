@@ -80,6 +80,12 @@ func (s *Server) Start(ctx context.Context) error {
 		"statusBadge":   statusBadge,
 		"timeAgo":       timeAgo,
 		"jsonMarshal":   jsonMarshal,
+		"lt":            func(a, b int) bool { return a < b },
+		"gt":            func(a, b int) bool { return a > b },
+		"le":            func(a, b int) bool { return a <= b },
+		"ge":            func(a, b int) bool { return a >= b },
+		"add":           func(a, b int) int { return a + b },
+		"sub":           func(a, b int) int { return a - b },
 	}).ParseGlob(filepath.Join(tmplDir, "*.html"))
 	if err != nil {
 		return fmt.Errorf("parsing templates: %w", err)
