@@ -3,7 +3,7 @@ title: Suspicious Scheduled Task Creation
 description: Detects creation of scheduled tasks via schtasks.exe or at command that could indicate persistence mechanisms. Attackers commonly use scheduled tasks to maintain access or execute malicious payloads at defined intervals.
 severity: high
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
     - attack.persistence
     - attack.execution

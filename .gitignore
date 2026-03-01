@@ -24,9 +24,10 @@ vendor/
 .DS_Store
 Thumbs.db
 
-# Sentinel
-sentinel.db
-sentinel.yaml
+# SecClaw
+secclaw
+secclaw.db
+secclaw.yaml
 *.log
 data/
 

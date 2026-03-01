@@ -6,7 +6,7 @@ description: >
   impersonation, Potato exploits, and token duplication attacks.
 severity: critical
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
     - attack.privilege_escalation
     - attack.defense_evasion

@@ -1,7 +1,7 @@
-# Sentinel - Blue Team Defensive Agent
+# SecClaw - Blue Team Defensive Agent
 
 ## Project Overview
-Sentinel is a cross-platform security monitoring agent built in Go with an htmx WebUI and Telegram bot integration. It watches system logs in real-time, detects threats using SIGMA-compatible rules, and orchestrates semi-automated defensive responses.
+SecClaw is a cross-platform security monitoring agent built in Go with an htmx WebUI and Telegram bot integration. It watches system logs in real-time, detects threats using SIGMA-compatible rules, and orchestrates semi-automated defensive responses.
 
 ## Architecture
 - **Core Agent** (Go): Log collection, detection engine, response orchestrator
@@ -20,5 +20,5 @@ Sentinel is a cross-platform security monitoring agent built in Go with an htmx 
 - Use Go idioms: interfaces, error wrapping, structured logging
 - Build tags for platform-specific code (`//go:build linux`, `//go:build windows`)
 - All response actions require approval unless explicitly configured otherwise
-- Detection rules follow SIGMA format with sentinel extensions
+- Detection rules follow SIGMA format with SecClaw extensions
 - WebUI uses htmx for reactivity, no JavaScript frameworks

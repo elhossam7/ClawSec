@@ -6,7 +6,7 @@ description: >
   domain names, excessive NXDOMAIN responses, and patterns typical of DGA malware.
 severity: high
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
     - attack.command_and_control
     - attack.t1568.002

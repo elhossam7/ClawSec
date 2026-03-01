@@ -6,7 +6,7 @@ description: >
   and image file execution options used by adversaries to maintain access.
 severity: high
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
     - attack.persistence
     - attack.t1547.001

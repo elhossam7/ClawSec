@@ -1,4 +1,4 @@
-// Package config handles Sentinel configuration loading and validation.
+// Package config handles SecClaw configuration loading and validation.
 package config
 
 import (
@@ -11,7 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config is the top-level Sentinel configuration.
+// Config is the top-level SecClaw configuration.
 type Config struct {
 	Agent    AgentConfig    `yaml:"agent"`
 	Sources  SourcesConfig  `yaml:"sources"`
@@ -215,7 +215,7 @@ func DefaultConfig() *Config {
 		Web: WebConfig{
 			Enabled:    true,
 			ListenAddr: "127.0.0.1:8080",
-			TOTPIssuer: "Sentinel",
+			TOTPIssuer: "SecClaw",
 		},
 		Telegram: TelegramConfig{
 			Enabled: false,
@@ -228,7 +228,7 @@ func DefaultConfig() *Config {
 		},
 		Storage: StorageConfig{
 			Driver: "sqlite",
-			DSN:    "./data/sentinel.db",
+			DSN:    "./data/secclaw.db",
 		},
 		Logging: LoggingConfig{
 			Level:  "info",

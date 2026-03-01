@@ -3,7 +3,7 @@ title: Binary Execution from Suspicious Path
 description: Detects execution of binaries from world-writable or unusual directories such as /tmp, /dev/shm, /var/tmp, and user Downloads folders. Legitimate software rarely executes from these locations, making this a strong indicator of malicious activity.
 severity: medium
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
     - attack.execution
     - attack.defense_evasion

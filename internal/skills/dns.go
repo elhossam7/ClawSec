@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog"
-	"github.com/sentinel-agent/sentinel/internal/types"
+	"github.com/elhossam7/SecClaw/internal/types"
 )
 
 // DNSLookupSkill resolves hostnames, reverse DNS, and specific record types.

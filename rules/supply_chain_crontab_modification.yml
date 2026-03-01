@@ -3,7 +3,7 @@ title: Unauthorized Crontab Modification
 description: Monitors for changes to scheduled tasks on Linux systems via crontab paths.
 severity: medium
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
   - attack.persistence
   - attack.t1053

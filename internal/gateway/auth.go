@@ -77,7 +77,7 @@ func (am *AuthManager) EnsureDefaultAdmin() (bool, error) {
 		return false, nil
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte("sentinel"), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte("secclaw"), bcrypt.DefaultCost)
 	if err != nil {
 		return false, fmt.Errorf("hashing default password: %w", err)
 	}
@@ -190,14 +190,14 @@ func (am *AuthManager) ChangePassword(username, newPassword string) error {
 	return nil
 }
 
-// IsDefaultPassword checks if the user still has the default "sentinel" password.
+// IsDefaultPassword checks if the user still has the default "secclaw" password.
 func (am *AuthManager) IsDefaultPassword(username string) bool {
 	var hash string
 	err := am.db.QueryRow("SELECT password_hash FROM users WHERE username = ?", username).Scan(&hash)
 	if err != nil {
 		return false
 	}
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte("sentinel")) == nil
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte("secclaw")) == nil
 }
 
 // --- Internal helpers ---

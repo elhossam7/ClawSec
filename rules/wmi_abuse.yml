@@ -6,7 +6,7 @@ description: >
   and remote WMI execution patterns used by adversaries.
 severity: high
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
     - attack.execution
     - attack.lateral_movement

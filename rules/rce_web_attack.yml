@@ -3,7 +3,7 @@ title: Remote Code Execution (RCE) Attack Detection
 description: Detects remote code execution attempts via web applications, including command injection, eval functions, and shell execution attempts. This prevents complete system takeover through web vulnerabilities.
 severity: critical
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
     - attack.t1059
     - attack.execution

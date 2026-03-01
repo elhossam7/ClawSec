@@ -1,17 +1,17 @@
 version: "3.8"
 
 services:
-  sentinel:
+  secclaw:
     build:
       context: ..
       dockerfile: deployments/Dockerfile
-    container_name: sentinel
+    container_name: secclaw
     restart: unless-stopped
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
-      - sentinel-data:/opt/sentinel/data
-      - ./sentinel.yaml:/opt/sentinel/sentinel.yaml:ro
+      - secclaw-data:/opt/secclaw/data
+      - ./secclaw.yaml:/opt/secclaw/secclaw.yaml:ro
       # Mount host logs for monitoring (optional).
       # - /var/log:/var/log:ro
     environment:
@@ -19,11 +19,11 @@ services:
     cap_add:
       - NET_ADMIN
     networks:
-      - sentinel-net
+      - secclaw-net
 
 volumes:
-  sentinel-data:
+  secclaw-data:
 
 networks:
-  sentinel-net:
+  secclaw-net:
     driver: bridge

@@ -68,7 +68,7 @@ func TestAuthenticate_ValidCredentials(t *testing.T) {
 	am := NewAuthManager(db)
 	am.EnsureDefaultAdmin()
 
-	session, err := am.Authenticate("admin", "sentinel", "127.0.0.1")
+	session, err := am.Authenticate("admin", "secclaw", "127.0.0.1")
 	if err != nil {
 		t.Fatalf("Authenticate: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestAuthenticate_InvalidUsername(t *testing.T) {
 	am := NewAuthManager(db)
 	am.EnsureDefaultAdmin()
 
-	_, err := am.Authenticate("nonexistent", "sentinel", "127.0.0.1")
+	_, err := am.Authenticate("nonexistent", "secclaw", "127.0.0.1")
 	if err == nil {
 		t.Error("expected error for nonexistent user")
 	}
@@ -121,13 +121,13 @@ func TestAuthenticate_RateLimiting(t *testing.T) {
 	}
 
 	// Next attempt should be rate limited even with correct password.
-	_, err := am.Authenticate("admin", "sentinel", "10.0.0.1")
+	_, err := am.Authenticate("admin", "secclaw", "10.0.0.1")
 	if err == nil {
 		t.Error("expected rate limit error")
 	}
 
 	// Different IP should NOT be rate-limited.
-	session, err := am.Authenticate("admin", "sentinel", "10.0.0.2")
+	session, err := am.Authenticate("admin", "secclaw", "10.0.0.2")
 	if err != nil {
 		t.Fatalf("expected success from different IP: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestValidateSession(t *testing.T) {
 	am := NewAuthManager(db)
 	am.EnsureDefaultAdmin()
 
-	session, _ := am.Authenticate("admin", "sentinel", "127.0.0.1")
+	session, _ := am.Authenticate("admin", "secclaw", "127.0.0.1")
 
 	// Valid session.
 	s, ok := am.ValidateSession(session.Token)
@@ -161,7 +161,7 @@ func TestValidateCSRF(t *testing.T) {
 	am := NewAuthManager(db)
 	am.EnsureDefaultAdmin()
 
-	session, _ := am.Authenticate("admin", "sentinel", "127.0.0.1")
+	session, _ := am.Authenticate("admin", "secclaw", "127.0.0.1")
 
 	if !am.ValidateCSRF(session.Token, session.CSRFToken) {
 		t.Error("expected valid CSRF")
@@ -179,7 +179,7 @@ func TestDestroySession(t *testing.T) {
 	am := NewAuthManager(db)
 	am.EnsureDefaultAdmin()
 
-	session, _ := am.Authenticate("admin", "sentinel", "127.0.0.1")
+	session, _ := am.Authenticate("admin", "secclaw", "127.0.0.1")
 	am.DestroySession(session.Token)
 
 	_, ok := am.ValidateSession(session.Token)
@@ -200,7 +200,7 @@ func TestChangePassword(t *testing.T) {
 	}
 
 	// Old password should fail.
-	_, err = am.Authenticate("admin", "sentinel", "127.0.0.1")
+	_, err = am.Authenticate("admin", "secclaw", "127.0.0.1")
 	if err == nil {
 		t.Error("expected old password to fail")
 	}
@@ -371,14 +371,14 @@ func TestAuthenticateWithTOTP(t *testing.T) {
 	secret, _, _ := am.EnableTOTP("admin")
 
 	// Authenticate without TOTP code should require it.
-	_, err := am.AuthenticateWithTOTP("admin", "sentinel", "", "127.0.0.1")
+	_, err := am.AuthenticateWithTOTP("admin", "secclaw", "", "127.0.0.1")
 	if err == nil || err.Error() != "totp_required" {
 		t.Errorf("expected totp_required, got %v", err)
 	}
 
 	// Authenticate with valid TOTP code.
 	code := generateTOTPCode(t, secret, time.Now())
-	session, err := am.AuthenticateWithTOTP("admin", "sentinel", code, "127.0.0.1")
+	session, err := am.AuthenticateWithTOTP("admin", "secclaw", code, "127.0.0.1")
 	if err != nil {
 		t.Fatalf("AuthenticateWithTOTP: %v", err)
 	}
@@ -387,7 +387,7 @@ func TestAuthenticateWithTOTP(t *testing.T) {
 	}
 
 	// Authenticate with wrong TOTP code.
-	_, err = am.AuthenticateWithTOTP("admin", "sentinel", "000000", "127.0.0.2")
+	_, err = am.AuthenticateWithTOTP("admin", "secclaw", "000000", "127.0.0.2")
 	if err == nil {
 		t.Error("expected error for wrong TOTP code")
 	}

@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog"
-	"github.com/sentinel-agent/sentinel/internal/types"
+	"github.com/elhossam7/SecClaw/internal/types"
 )
 
 // LogSource is the interface all platform-specific log collectors implement.

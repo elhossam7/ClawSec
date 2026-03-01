@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/sentinel-agent/sentinel/internal/types"
+	"github.com/elhossam7/SecClaw/internal/types"
 )
 
 // IPReputationSkill queries external threat intelligence for IP reputation.

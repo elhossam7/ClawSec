@@ -3,7 +3,7 @@ title: Suspicious PowerShell Execution
 description: Detects common patterns used in malicious PowerShell scripts, such as Invoke-Expression, DownloadString, and -EncodedCommand.
 severity: high
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
     - attack.t1059.001
     - attack.t1027

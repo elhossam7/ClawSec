@@ -1,4 +1,4 @@
-module github.com/sentinel-agent/sentinel
+module github.com/elhossam7/SecClaw
 
 go 1.24.0
 

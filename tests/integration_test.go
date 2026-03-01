@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/sentinel-agent/sentinel/internal/agent"
-	"github.com/sentinel-agent/sentinel/internal/config"
-	"github.com/sentinel-agent/sentinel/internal/response"
-	"github.com/sentinel-agent/sentinel/internal/skills"
-	"github.com/sentinel-agent/sentinel/internal/types"
+	"github.com/elhossam7/SecClaw/internal/agent"
+	"github.com/elhossam7/SecClaw/internal/config"
+	"github.com/elhossam7/SecClaw/internal/response"
+	"github.com/elhossam7/SecClaw/internal/skills"
+	"github.com/elhossam7/SecClaw/internal/types"
 
 	_ "modernc.org/sqlite"
 )

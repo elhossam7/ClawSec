@@ -8,7 +8,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=1 GOOS=linux go build -ldflags "-s -w -X main.Version=docker -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o /sentinel ./cmd/sentinel/
+RUN CGO_ENABLED=1 GOOS=linux go build -ldflags "-s -w -X main.Version=docker -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o /secclaw ./cmd/sentinel/
 
 # Runtime stage
 FROM alpine:3.19
@@ -16,20 +16,20 @@ FROM alpine:3.19
 RUN apk add --no-cache ca-certificates sqlite iptables
 
 # Non-root user
-RUN addgroup -S sentinel && adduser -S sentinel -G sentinel
+RUN addgroup -S secclaw && adduser -S secclaw -G secclaw
 
-WORKDIR /opt/sentinel
-COPY --from=builder /sentinel /usr/local/bin/sentinel
+WORKDIR /opt/secclaw
+COPY --from=builder /secclaw /usr/local/bin/secclaw
 COPY rules/ ./rules/
 COPY web/ ./web/
 
-RUN mkdir -p data && chown -R sentinel:sentinel /opt/sentinel
+RUN mkdir -p data && chown -R secclaw:secclaw /opt/secclaw
 
-USER sentinel
+USER secclaw
 
 EXPOSE 8080
 
-VOLUME ["/opt/sentinel/data"]
+VOLUME ["/opt/secclaw/data"]
 
-ENTRYPOINT ["sentinel"]
+ENTRYPOINT ["secclaw"]
 CMD ["run"]

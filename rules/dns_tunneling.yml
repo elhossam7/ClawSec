@@ -3,7 +3,7 @@ title: DNS Tunneling Detection
 description: Detects potential DNS tunneling activity by identifying unusually long DNS queries and high-frequency DNS requests to the same domain, which may indicate covert data exfiltration or C2 communication over DNS.
 severity: high
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
     - attack.command_and_control
     - attack.exfiltration

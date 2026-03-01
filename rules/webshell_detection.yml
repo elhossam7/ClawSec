@@ -6,7 +6,7 @@ description: >
   that indicate an attacker has planted a web shell for persistent access.
 severity: critical
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
     - attack.persistence
     - attack.t1505.003

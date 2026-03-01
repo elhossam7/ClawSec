@@ -6,7 +6,7 @@ description: >
   and known malicious infrastructure indicators.
 severity: high
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
     - attack.command_and_control
     - attack.t1071.001

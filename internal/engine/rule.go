@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sentinel-agent/sentinel/internal/platform"
-	"github.com/sentinel-agent/sentinel/internal/types"
+	"github.com/elhossam7/SecClaw/internal/platform"
+	"github.com/elhossam7/SecClaw/internal/types"
 	"gopkg.in/yaml.v3"
 )
 

@@ -4,7 +4,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/sentinel-agent/sentinel/internal/types"
+	"github.com/elhossam7/SecClaw/internal/types"
 )
 
 // FieldMapping maps a source-specific field name to the normalized field name.

@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
-	"github.com/sentinel-agent/sentinel/internal/types"
+	"github.com/elhossam7/SecClaw/internal/types"
 )
 
 // AssetQuerySkill queries the asset/incident database for host context.

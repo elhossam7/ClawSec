@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/sentinel-agent/sentinel/internal/config"
-	"github.com/sentinel-agent/sentinel/internal/types"
+	"github.com/elhossam7/SecClaw/internal/config"
+	"github.com/elhossam7/SecClaw/internal/types"
 )
 
 // Orchestrator manages the response action lifecycle:

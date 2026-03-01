@@ -3,7 +3,7 @@ title: Cross-Site Scripting (XSS) Attack Detection
 description: Detects XSS attacks in web applications by identifying common XSS payloads and patterns in web requests. XSS attacks can lead to client-side code execution, session hijacking, and data theft.
 severity: high
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
     - attack.t1059.001
     - attack.t1203

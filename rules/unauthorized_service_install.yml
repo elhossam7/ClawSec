@@ -3,7 +3,7 @@ title: Unauthorized Service Installation Detection
 description: Detects installation of new services through sc.exe, New-Service PowerShell cmdlet, or systemd unit file creation. Attackers install malicious services to achieve persistence and privilege escalation on compromised hosts.
 severity: high
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
     - attack.persistence
     - attack.privilege_escalation

@@ -3,7 +3,7 @@ title: SQL Injection Attempt Detected
 description: Detects common SQL injection patterns in web server access logs
 severity: critical
 status: active
-author: Sentinel
+author: SecClaw
 tags:
   - attack.initial_access
   - attack.t1190

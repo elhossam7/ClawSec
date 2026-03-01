@@ -3,7 +3,7 @@ title: Lateral Movement via PsExec Detection
 description: Detects lateral movement attempts using PsExec or similar remote execution tools. PsExec creates a service on the remote system and executes commands, which is a common lateral movement technique used by attackers.
 severity: high
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
     - attack.lateral_movement
     - attack.execution

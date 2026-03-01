@@ -6,7 +6,7 @@ description: >
   Kerberos ticket requests (Event ID 4769) with RC4 encryption (0x17).
 severity: high
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
     - attack.credential_access
     - attack.t1558.003
