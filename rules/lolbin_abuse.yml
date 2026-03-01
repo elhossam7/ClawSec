@@ -6,7 +6,7 @@ description: >
   Covers mshta, regsvr32, bitsadmin, cmstp, msiexec, and others.
 severity: high
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
     - attack.defense_evasion
     - attack.execution

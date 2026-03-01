@@ -148,8 +148,8 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.Storage.Driver != "sqlite" {
 		t.Errorf("Storage.Driver = %q; want %q", cfg.Storage.Driver, "sqlite")
 	}
-	if cfg.Storage.DSN != "./data/sentinel.db" {
-		t.Errorf("Storage.DSN = %q; want %q", cfg.Storage.DSN, "./data/sentinel.db")
+	if cfg.Storage.DSN != "./data/secclaw.db" {
+		t.Errorf("Storage.DSN = %q; want %q", cfg.Storage.DSN, "./data/secclaw.db")
 	}
 
 	// --- Response ---

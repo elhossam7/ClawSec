@@ -14,13 +14,13 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/sentinel-agent/sentinel/internal/agent"
-	"github.com/sentinel-agent/sentinel/internal/config"
-	"github.com/sentinel-agent/sentinel/internal/engine"
-	"github.com/sentinel-agent/sentinel/internal/logging"
-	"github.com/sentinel-agent/sentinel/internal/response"
-	"github.com/sentinel-agent/sentinel/internal/storage"
-	"github.com/sentinel-agent/sentinel/internal/types"
+	"github.com/elhossam7/SecClaw/internal/agent"
+	"github.com/elhossam7/SecClaw/internal/config"
+	"github.com/elhossam7/SecClaw/internal/engine"
+	"github.com/elhossam7/SecClaw/internal/logging"
+	"github.com/elhossam7/SecClaw/internal/response"
+	"github.com/elhossam7/SecClaw/internal/storage"
+	"github.com/elhossam7/SecClaw/internal/types"
 )
 
 // Server is the HTTP/WebSocket gateway for Sentinel.
@@ -49,7 +49,7 @@ func NewServer(cfg config.WebConfig, store *storage.SQLite, eng *engine.Engine, 
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to ensure default admin user")
 	} else if created {
-		logger.Warn().Msg("created default admin user (admin/sentinel) — change password immediately")
+		logger.Warn().Msg("created default admin user (admin/secclaw) — change password immediately")
 	}
 
 	return &Server{
@@ -663,7 +663,7 @@ func (s *Server) handleAPIAgentHealth(w http.ResponseWriter, r *http.Request) {
 	if s.agent == nil {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":  "disabled",
-			"message": "AI agent not configured. Set ai.provider in sentinel.yaml.",
+			"message": "AI agent not configured. Set ai.provider in secclaw.yaml.",
 		})
 		return
 	}
@@ -848,7 +848,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	if s.agent == nil {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(ChatResponse{
-			Error: "AI agent not configured. Set ai.provider in sentinel.yaml.",
+			Error: "AI agent not configured. Set ai.provider in secclaw.yaml.",
 		})
 		return
 	}

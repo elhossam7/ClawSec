@@ -1,14 +1,14 @@
 [Unit]
-Description=Sentinel Blue Team Defensive Agent
+Description=SecClaw Blue Team Defensive Agent
 After=network.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=sentinel
-Group=sentinel
-WorkingDirectory=/opt/sentinel
-ExecStart=/usr/local/bin/sentinel run
+User=secclaw
+Group=secclaw
+WorkingDirectory=/opt/secclaw
+ExecStart=/usr/local/bin/secclaw run
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartSec=5s
@@ -17,7 +17,7 @@ RestartSec=5s
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/sentinel/data
+ReadWritePaths=/opt/secclaw/data
 PrivateTmp=true
 
 # Capabilities for network blocking
@@ -27,7 +27,7 @@ CapabilityBoundingSet=CAP_NET_ADMIN CAP_DAC_READ_SEARCH
 # Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=sentinel
+SyslogIdentifier=secclaw
 
 [Install]
 WantedBy=multi-user.target

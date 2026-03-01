@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog"
-	"github.com/sentinel-agent/sentinel/internal/types"
+	"github.com/elhossam7/SecClaw/internal/types"
 )
 
 // FirewallSkill blocks/unblocks IP addresses using the system firewall.

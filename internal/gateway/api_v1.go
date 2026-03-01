@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sentinel-agent/sentinel/internal/types"
+	"github.com/elhossam7/SecClaw/internal/types"
 )
 
 // ---------------------------------------------------------------------------

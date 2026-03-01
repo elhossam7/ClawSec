@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog"
-	"github.com/sentinel-agent/sentinel/internal/types"
+	"github.com/elhossam7/SecClaw/internal/types"
 )
 
 // UserInfoSkill looks up local user account details including groups, last login,

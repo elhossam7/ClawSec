@@ -3,7 +3,7 @@ title: Reverse Shell Execution Detection
 description: Detects reverse shell patterns including bash interactive shells, netcat with execute flags, Python PTY spawns, and other common reverse shell one-liners used to establish interactive backdoor sessions.
 severity: critical
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
     - attack.execution
     - attack.command_and_control

@@ -3,7 +3,7 @@ title: Pass-the-Hash Attack Detection
 description: Detects Pass-the-Hash attacks by identifying multiple logins from the same account with different source IPs, unusual authentication patterns, and lateral movement indicators. Pass-the-hash attacks allow attackers to move laterally without knowing the actual password.
 severity: critical
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
     - attack.t1078
     - attack.credential_access

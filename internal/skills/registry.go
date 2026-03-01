@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog"
-	"github.com/sentinel-agent/sentinel/internal/types"
+	"github.com/elhossam7/SecClaw/internal/types"
 )
 
 // Tool is the interface every skill must implement.

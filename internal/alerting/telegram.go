@@ -7,9 +7,9 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog"
-	"github.com/sentinel-agent/sentinel/internal/config"
-	"github.com/sentinel-agent/sentinel/internal/response"
-	"github.com/sentinel-agent/sentinel/internal/types"
+	"github.com/elhossam7/SecClaw/internal/config"
+	"github.com/elhossam7/SecClaw/internal/response"
+	"github.com/elhossam7/SecClaw/internal/types"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )

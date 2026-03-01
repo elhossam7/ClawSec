@@ -3,7 +3,7 @@ title: Path Traversal Attack Detected
 description: Detects path traversal (directory traversal) attempts in web logs
 severity: high
 status: active
-author: Sentinel
+author: SecClaw
 tags:
   - attack.initial_access
   - attack.t1190

@@ -1,4 +1,4 @@
-BINARY_NAME=sentinel
+BINARY_NAME=secclaw
 VERSION?=0.1.0
 BUILD_TIME=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS=-ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME)"
@@ -62,7 +62,7 @@ test-llm:
 # --- Docker targets ---
 
 docker-build:
-	docker build -t sentinel:$(VERSION) -f deployments/Dockerfile .
+	docker build -t secclaw:$(VERSION) -f deployments/Dockerfile .
 
 docker-run:
 	docker-compose -f deployments/docker-compose.yml up -d

@@ -1,4 +1,4 @@
-// Sentinel - Blue Team Defensive Agent
+// SecClaw - Blue Team Defensive Agent
 // Main entry point with CLI interface.
 package main
 
@@ -13,17 +13,17 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/sentinel-agent/sentinel/internal/agent"
-	"github.com/sentinel-agent/sentinel/internal/alerting"
-	"github.com/sentinel-agent/sentinel/internal/config"
-	"github.com/sentinel-agent/sentinel/internal/engine"
-	"github.com/sentinel-agent/sentinel/internal/gateway"
-	"github.com/sentinel-agent/sentinel/internal/logging"
-	"github.com/sentinel-agent/sentinel/internal/platform"
-	"github.com/sentinel-agent/sentinel/internal/response"
-	"github.com/sentinel-agent/sentinel/internal/skills"
-	"github.com/sentinel-agent/sentinel/internal/storage"
-	"github.com/sentinel-agent/sentinel/internal/types"
+	"github.com/elhossam7/SecClaw/internal/agent"
+	"github.com/elhossam7/SecClaw/internal/alerting"
+	"github.com/elhossam7/SecClaw/internal/config"
+	"github.com/elhossam7/SecClaw/internal/engine"
+	"github.com/elhossam7/SecClaw/internal/gateway"
+	"github.com/elhossam7/SecClaw/internal/logging"
+	"github.com/elhossam7/SecClaw/internal/platform"
+	"github.com/elhossam7/SecClaw/internal/response"
+	"github.com/elhossam7/SecClaw/internal/skills"
+	"github.com/elhossam7/SecClaw/internal/storage"
+	"github.com/elhossam7/SecClaw/internal/types"
 )
 
 var (
@@ -45,7 +45,7 @@ func main() {
 	case "status":
 		cmdStatus()
 	case "version":
-		fmt.Printf("Sentinel %s (built %s)\n", Version, BuildTime)
+		fmt.Printf("SecClaw %s (built %s)\n", Version, BuildTime)
 	case "rules":
 		cmdRules()
 	case "validate-config":
@@ -64,32 +64,32 @@ func main() {
 }
 
 func printUsage() {
-	fmt.Println(`Sentinel - Blue Team Defensive Agent
+	fmt.Println(`SecClaw - Blue Team Defensive Agent
 
 Usage:
-  sentinel <command> [options]
+  secclaw <command> [options]
 
 Commands:
   init              Initialize configuration and database
   run               Start the agent (main daemon)
   status            Show agent health and queue status
   rules             Manage detection rules (list, enable, disable)
-  validate-config   Validate sentinel.yaml configuration
+  validate-config   Validate secclaw.yaml configuration
   validate-rules    Validate detection rules against event schema
   test-llm          Test LLM provider connectivity
   version           Print version information
   help              Show this help
 
-Run 'sentinel run' to start monitoring. The WebUI will be available at http://127.0.0.1:8080
+Run 'secclaw run' to start monitoring. The WebUI will be available at http://127.0.0.1:8080
 
-Configuration: sentinel.yaml (created by 'sentinel init')`)
+Configuration: secclaw.yaml (created by 'secclaw init')`)
 }
 
 // cmdInit creates default configuration and data directories.
 func cmdInit() {
-	configPath := "sentinel.yaml"
+	configPath := "secclaw.yaml"
 	if _, err := os.Stat(configPath); err == nil {
-		fmt.Println("sentinel.yaml already exists. Delete it to re-initialize.")
+		fmt.Println("secclaw.yaml already exists. Delete it to re-initialize.")
 		return
 	}
 
@@ -122,22 +122,22 @@ func cmdInit() {
 	}
 	store.Close()
 
-	fmt.Println("✓ Sentinel initialized successfully!")
+	fmt.Println("✓ SecClaw initialized successfully!")
 	fmt.Printf("  Config: %s\n", configPath)
 	fmt.Printf("  Data:   %s\n", cfg.Agent.DataDir)
 	fmt.Printf("  Rules:  %s\n", cfg.Agent.RulesDir)
 	fmt.Printf("  DB:     %s\n", cfg.Storage.DSN)
-	fmt.Println("\nEdit sentinel.yaml to configure log sources and alerts.")
-	fmt.Println("Run 'sentinel run' to start the agent.")
+	fmt.Println("\nEdit secclaw.yaml to configure log sources and alerts.")
+	fmt.Println("Run 'secclaw run' to start the agent.")
 }
 
-// cmdRun starts the main Sentinel daemon.
+// cmdRun starts the main SecClaw daemon.
 func cmdRun() {
 	// Load config.
-	cfg, err := config.Load("sentinel.yaml")
+	cfg, err := config.Load("secclaw.yaml")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
-		fmt.Println("Run 'sentinel init' to create a default configuration.")
+		fmt.Println("Run 'secclaw init' to create a default configuration.")
 		os.Exit(1)
 	}
 
@@ -146,7 +146,7 @@ func cmdRun() {
 	logger.Info().
 		Str("version", Version).
 		Str("platform", cfg.Agent.Platform).
-		Msg("starting Sentinel")
+		Msg("starting SecClaw")
 
 	// Create context with signal handling.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -448,7 +448,7 @@ func cmdRun() {
 
 	// Start platform log collection.
 	if err := platformMgr.Start(ctx); err != nil {
-		logger.Warn().Err(err).Msg("no log sources started (configure sources in sentinel.yaml)")
+		logger.Warn().Err(err).Msg("no log sources started (configure sources in secclaw.yaml)")
 	}
 
 	// Start detection engine.
@@ -462,7 +462,7 @@ func cmdRun() {
 		Bool("dry_run", cfg.Response.DryRun).
 		Bool("ai_enabled", aiAgent != nil).
 		Str("ai_provider", cfg.AI.Provider).
-		Msg("Sentinel is running")
+		Msg("SecClaw is running")
 
 	if cfg.Web.Enabled {
 		logger.Info().Msgf("WebUI available at http://%s", cfg.Web.ListenAddr)
@@ -470,15 +470,15 @@ func cmdRun() {
 
 	// Wait for shutdown.
 	<-ctx.Done()
-	logger.Info().Msg("Sentinel shutting down")
+	logger.Info().Msg("SecClaw shutting down")
 	platformMgr.Stop()
 }
 
 // cmdStatus prints a quick health summary.
 func cmdStatus() {
-	cfg, err := config.Load("sentinel.yaml")
+	cfg, err := config.Load("secclaw.yaml")
 	if err != nil {
-		fmt.Println("Error: Could not load config. Is Sentinel initialized?")
+		fmt.Println("Error: Could not load config. Is SecClaw initialized?")
 		os.Exit(1)
 	}
 
@@ -495,8 +495,8 @@ func cmdStatus() {
 	incidents, _ := store.IncidentCount()
 	pending, _ := store.PendingActionCount()
 
-	fmt.Println("Sentinel Status")
-	fmt.Println("═══════════════")
+	fmt.Println("SecClaw Status")
+	fmt.Println("═════════════")
 	fmt.Printf("  Platform:       %s\n", cfg.Agent.Platform)
 	fmt.Printf("  Storage:        %s (%s)\n", cfg.Storage.Driver, cfg.Storage.DSN)
 	fmt.Printf("  Total Events:   %d\n", events)
@@ -510,11 +510,11 @@ func cmdStatus() {
 // cmdRules manages detection rules.
 func cmdRules() {
 	if len(os.Args) < 3 {
-		fmt.Println("Usage: sentinel rules <list|enable|disable> [rule-id]")
+		fmt.Println("Usage: secclaw rules <list|enable|disable> [rule-id]")
 		return
 	}
 
-	cfg, err := config.Load("sentinel.yaml")
+	cfg, err := config.Load("secclaw.yaml")
 	if err != nil {
 		fmt.Println("Error: Could not load config.")
 		os.Exit(1)
@@ -600,9 +600,9 @@ func setupLogger(cfg config.LoggingConfig) zerolog.Logger {
 // webServer is a package-level reference for wiring SSE broadcasts.
 var webServer *gateway.Server
 
-// cmdValidateConfig checks sentinel.yaml for errors without starting the daemon.
+// cmdValidateConfig checks secclaw.yaml for errors without starting the daemon.
 func cmdValidateConfig() {
-	cfg, err := config.Load("sentinel.yaml")
+	cfg, err := config.Load("secclaw.yaml")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "✗ Configuration invalid: %v\n", err)
 		os.Exit(1)
@@ -627,7 +627,7 @@ func cmdValidateConfig() {
 
 // cmdValidateRules validates all detection rules against the event schema.
 func cmdValidateRules() {
-	cfg, err := config.Load("sentinel.yaml")
+	cfg, err := config.Load("secclaw.yaml")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
 		os.Exit(1)
@@ -668,14 +668,14 @@ func cmdValidateRules() {
 
 // cmdTestLLM verifies the configured LLM provider is reachable.
 func cmdTestLLM() {
-	cfg, err := config.Load("sentinel.yaml")
+	cfg, err := config.Load("secclaw.yaml")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
 		os.Exit(1)
 	}
 
 	if cfg.AI.Provider == "" {
-		fmt.Fprintln(os.Stderr, "Error: ai.provider is not configured in sentinel.yaml")
+		fmt.Fprintln(os.Stderr, "Error: ai.provider is not configured in secclaw.yaml")
 		os.Exit(1)
 	}
 

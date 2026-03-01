@@ -3,7 +3,7 @@ title: Security Log Clearing Detection
 description: Detects attempts to clear Windows event logs or Linux system logs using tools like wevtutil, Clear-EventLog, or direct log file removal. Log clearing is a defense evasion technique to cover attacker tracks.
 severity: critical
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
     - attack.defense_evasion
     - attack.t1070.001

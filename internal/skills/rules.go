@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/sentinel-agent/sentinel/internal/engine"
-	"github.com/sentinel-agent/sentinel/internal/types"
+	"github.com/elhossam7/SecClaw/internal/engine"
+	"github.com/elhossam7/SecClaw/internal/types"
 )
 
 // ---------------------------------------------------------------------------
@@ -333,7 +333,7 @@ func (s *CreateRuleSkill) Execute(ctx context.Context, params map[string]interfa
 		Description: desc,
 		Severity:    strings.ToLower(sev),
 		Status:      "active",
-		Author:      "sentinel-ai",
+		Author:      "secclaw-ai",
 	}
 
 	// Tags.
@@ -541,7 +541,7 @@ func (s *UpdateRuleSkill) Execute(ctx context.Context, params map[string]interfa
 		Title:       existing.Title,
 		Description: existing.Description,
 		Severity:    existing.Severity.String(),
-		Author:      "sentinel-ai",
+		Author:      "secclaw-ai",
 		Tags:        existing.Tags,
 		LogSource:   existing.LogSource,
 		Correlation: existing.Correlation,

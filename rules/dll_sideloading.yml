@@ -6,7 +6,7 @@ description: >
   from temp directories, and process hollowing indicators.
 severity: high
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
     - attack.defense_evasion
     - attack.t1574.002

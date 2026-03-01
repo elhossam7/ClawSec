@@ -2,12 +2,12 @@
 
 **Blue Team Defensive Agent** — Cross-platform security monitoring with real-time threat detection, semi-automated response, and multi-channel alerting.
 
-Sentinel watches system logs in real-time, detects threats using SIGMA-compatible rules, queues response actions for human approval via Telegram/WebUI, and executes defensive responses with full rollback support.
+SecClaw watches system logs in real-time, detects threats using SIGMA-compatible rules, queues response actions for human approval via Telegram/WebUI, and executes defensive responses with full rollback support.
 
 ## Features
 
 - **Cross-Platform**: Linux (journald, syslog, file watchers) and Windows (Event Log, file watchers)
-- **SIGMA-Compatible Rules**: Community-standard detection format with Sentinel response extensions
+- **SIGMA-Compatible Rules**: Community-standard detection format with SecClaw response extensions
 - **Semi-Automated Response**: Actions require human approval before execution (configurable)
 - **Correlation Engine**: Threshold-based detection (e.g., "5 failed logins in 5 minutes from same IP")
 - **WebUI Dashboard**: Real-time htmx dashboard with SSE live updates, no JavaScript frameworks
@@ -20,20 +20,20 @@ Sentinel watches system logs in real-time, detects threats using SIGMA-compatibl
 
 ### 1. Build
 ```bash
-git clone https://github.com/sentinel-agent/sentinel.git
-cd sentinel
+git clone https://github.com/elhossam7/SecClaw.git
+cd SecClaw
 go mod tidy
 make build
 ```
 
 ### 2. Initialize
 ```bash
-./bin/sentinel init
+./bin/secclaw init
 ```
-This creates `sentinel.yaml` with platform-appropriate defaults.
+This creates `secclaw.yaml` with platform-appropriate defaults.
 
 ### 3. Configure
-Edit `sentinel.yaml` to set up log sources:
+Edit `secclaw.yaml` to set up log sources:
 ```yaml
 sources:
   files:
@@ -60,16 +60,16 @@ telegram:
 
 ### 4. Run
 ```bash
-./bin/sentinel run
+./bin/secclaw run
 ```
 
-Open http://127.0.0.1:8080 — Login with `admin` / `sentinel` (change immediately).
+Open http://127.0.0.1:8080 — Login with `admin` / `secclaw` (change immediately).
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    Sentinel Agent                        │
+│                    SecClaw Agent                        │
 │                                                         │
 │  ┌─────────┐  ┌──────────┐  ┌────────────┐            │
 │  │ Platform │  │Detection │  │  Response   │            │
@@ -98,7 +98,7 @@ Open http://127.0.0.1:8080 — Login with `admin` / `sentinel` (change immediate
 
 ## Detection Rules
 
-Rules follow the SIGMA format with Sentinel extensions for response actions:
+Rules follow the SIGMA format with SecClaw extensions for response actions:
 
 ```yaml
 id: ssh_brute_force
@@ -140,11 +140,11 @@ response:
 ## CLI Commands
 
 ```
-sentinel init        Initialize config and database
-sentinel run         Start the agent
-sentinel status      Show health and queue status
-sentinel rules list  List all detection rules
-sentinel version     Print version
+secclaw init        Initialize config and database
+secclaw run         Start the agent
+secclaw status      Show health and queue status
+secclaw rules list  List all detection rules
+secclaw version     Print version
 ```
 
 ## Telegram Bot Commands
@@ -173,11 +173,11 @@ All actions support rollback within the configured window (default: 24h).
 
 ### Systemd (Linux)
 ```bash
-sudo cp bin/sentinel /usr/local/bin/
-sudo cp deployments/sentinel.service /etc/systemd/system/
-sudo useradd -r -s /bin/false sentinel
-sudo mkdir -p /opt/sentinel && sudo chown sentinel: /opt/sentinel
-sudo systemctl enable --now sentinel
+sudo cp bin/secclaw /usr/local/bin/
+sudo cp deployments/secclaw.service /etc/systemd/system/
+sudo useradd -r -s /bin/false secclaw
+sudo mkdir -p /opt/secclaw && sudo chown secclaw: /opt/secclaw
+sudo systemctl enable --now secclaw
 ```
 
 ### Docker

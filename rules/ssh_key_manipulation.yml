@@ -3,7 +3,7 @@ title: SSH Authorized Keys Manipulation
 description: Detects unauthorized modifications to SSH authorized_keys files, which attackers use to plant persistent backdoor access. Monitors for key additions, file permission changes, and suspicious key-related operations.
 severity: high
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
     - attack.persistence
     - attack.lateral_movement

@@ -3,7 +3,7 @@ title: Privilege Escalation Attempt
 description: Detects indicators of privilege escalation including sudo abuse and Windows special privilege assignment
 severity: critical
 status: active
-author: Sentinel
+author: SecClaw
 tags:
   - attack.privilege_escalation
   - attack.t1548

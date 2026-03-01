@@ -3,7 +3,7 @@ title: Container Escape Attempt
 description: Detects attempts to escape container isolation (Docker socket mounting, nsenter usage)
 severity: critical
 status: active
-author: Sentinel
+author: SecClaw
 tags:
   - attack.privilege_escalation
   - attack.t1611

@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"github.com/sentinel-agent/sentinel/internal/agent"
+	"github.com/elhossam7/SecClaw/internal/agent"
 )
 
 // AgentStoreAdapter wraps AgentStore to satisfy agent.AnalysisStore interface.

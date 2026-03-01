@@ -5,7 +5,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/sentinel-agent/sentinel/internal/types"
+	"github.com/elhossam7/SecClaw/internal/types"
 )
 
 // SystemPrompt is injected as the first message in every LLM call.

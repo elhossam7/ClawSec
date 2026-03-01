@@ -3,7 +3,7 @@ title: Inhibit System Recovery via VSSAdmin
 description: Detects attempts to delete system backups using vssadmin, a common ransomware technique.
 severity: critical
 status: active
-author: sentinel-ai
+author: secclaw-ai
 tags:
   - attack.impact
   - attack.t1490
