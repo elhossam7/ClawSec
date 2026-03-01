@@ -1,4 +1,4 @@
-# Sentinel
+# SecClaw
 
 **Blue Team Defensive Agent** — Cross-platform security monitoring with real-time threat detection, semi-automated response, and multi-channel alerting.
 
